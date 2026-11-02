@@ -10,6 +10,7 @@
     "tunnel": "npx untun tunnel --port 4000",
     "tunnel:localtunnel": "npx localtunnel --port 4000",
     "build": "npm run build -w backend && npm run build -w frontend",
+    "export:githubpage": "npm run build -w frontend && cp -r frontend/dist/* githubpage/ && cp frontend/dist/index.html githubpage/404.html && touch githubpage/.nojekyll",
     "deploy:pages": "npm run build -w frontend && npx gh-pages -d frontend/dist",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
