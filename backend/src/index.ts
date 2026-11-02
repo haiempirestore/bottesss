@@ -136,38 +136,47 @@ app.get('/api/auth/guest', async (_req, res) => {
   });
 });
 
-// Middleware chặn mọi truy cập Quản trị từ bên ngoài (chỉ cho phép localhost trên máy chủ)
+// Middleware xác thực Quản trị (cho phép localhost hoặc Admin Key 'hai1110' hoặc Bearer token)
 function requireLocalhost(req: express.Request, res: express.Response, next: express.NextFunction) {
-  const host = (req.headers['x-forwarded-host'] || req.headers.host || '').toString().toLowerCase();
-  const origin = (req.headers.origin || '').toString().toLowerCase();
-  const remoteIp = req.socket.remoteAddress || '';
-
-  // Chặn nếu request có origin từ GitHub Pages hoặc domain ngoài
-  if (origin && !origin.includes('localhost') && !origin.includes('127.0.0.1')) {
-    return res.status(403).json({ error: 'Truy cập bị từ chối: Trang quản trị chỉ được phép mở trực tiếp trên localhost máy chủ.' });
+  const adminKey = (req.headers['x-admin-key'] as string) || (req.query.adminKey as string);
+  if (adminKey === (process.env.ADMIN_KEY || 'hai1110')) {
+    return next();
   }
 
-  // Chặn nếu request đi qua tunnel công khai (Cloudflare, localtunnel, ngrok...)
-  if (host.includes('trycloudflare.com') || host.includes('loca.lt') || host.includes('ngrok') || host.includes('github.io')) {
-    return res.status(403).json({ error: 'Truy cập bị từ chối: Trang quản trị chỉ được phép mở trực tiếp trên localhost máy chủ.' });
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return next();
   }
 
-  // Kiểm tra kết nối từ localhost
+  const host = req.get('host') || '';
+  const remoteIp = req.socket?.remoteAddress || '';
   const isLocalIp = remoteIp === '127.0.0.1' || remoteIp === '::1' || remoteIp === '::ffff:127.0.0.1';
   const isLocalHost = host.startsWith('localhost') || host.startsWith('127.0.0.1');
 
-  if (!isLocalHost || !isLocalIp) {
-    return res.status(403).json({ error: 'Truy cập bị từ chối: Trang quản trị chỉ được phép mở trực tiếp trên localhost máy chủ.' });
+  if (isLocalHost || isLocalIp) {
+    return next();
   }
 
-  next();
+  return res.status(403).json({ error: 'Truy cập bị từ chối: Cần Admin Key hoặc mở trực tiếp trên localhost.' });
 }
 
 // Áp dụng bảo vệ nghiêm ngặt cho toàn bộ API Admin
 app.use('/api/admin', requireLocalhost);
 
-// Quản trị viên: Tự động cấp quyền Admin không cần mật khẩu/tài khoản (chỉ hoạt động khi gọi từ localhost)
-app.all(['/api/admin/login', '/api/admin/session'], async (_req, res) => {
+// Quản trị viên: Đăng nhập cấp token Admin (nhận diện localhost hoặc PIN/Key 'hai1110')
+app.all(['/api/admin/login', '/api/admin/session'], async (req, res) => {
+  const adminKey = req.body?.adminKey || (req.headers['x-admin-key'] as string) || (req.query?.adminKey as string);
+  const isKeyValid = adminKey === (process.env.ADMIN_KEY || 'hai1110');
+
+  const host = req.get('host') || '';
+  const remoteIp = req.socket?.remoteAddress || '';
+  const isLocalIp = remoteIp === '127.0.0.1' || remoteIp === '::1' || remoteIp === '::ffff:127.0.0.1';
+  const isLocalHost = host.startsWith('localhost') || host.startsWith('127.0.0.1');
+
+  if (!isKeyValid && !isLocalHost && !isLocalIp) {
+    return res.status(401).json({ error: 'Mã PIN / Admin Key không chính xác' });
+  }
+
   let admin = await prisma.admin.findFirst();
   if (!admin) {
     admin = await prisma.admin.create({
@@ -486,52 +495,457 @@ app.post('/api/webhooks/test-bank-transfer', async (req, res) => {
   res.json({ success: true, result });
 });
 
-// Admin APIs
-app.get('/api/admin/overview', adminAuth, async (_req, res) => {
-  const [users, orders, products, deposits] = await Promise.all([
-    prisma.user.count(), prisma.order.count(), prisma.product.count(), prisma.deposit.aggregate({ where: { status: 'PAID' }, _sum: { amount: true } })
-  ]);
-  res.json({ users, orders, products, deposited: deposits._sum.amount || 0 });
-});
-app.get('/api/admin/users', adminAuth, async (_req, res) => res.json(await prisma.user.findMany({ orderBy: { createdAt: 'desc' }, take: 200 })));
-app.get('/api/admin/orders', adminAuth, async (_req, res) => res.json(await prisma.order.findMany({ include: { user: true, items: { include: { product: true } } }, orderBy: { createdAt: 'desc' }, take: 200 })));
-app.post('/api/admin/categories', adminAuth, async (req, res) => {
-  const data = z.object({ name: z.string().min(1), slug: z.string().min(1).regex(/^[a-z0-9-]+$/), description: z.string().optional() }).parse(req.body);
-  res.json(await prisma.category.create({ data }));
-});
-app.post('/api/admin/products', adminAuth, async (req, res) => {
-  const data = z.object({ categoryId: z.string(), name: z.string().min(1), description: z.string().optional(), price: z.number().positive(), salePrice: z.number().positive().optional(), imageUrl: z.string().url().optional() }).parse(req.body);
-  res.json(await prisma.product.create({ data: { ...data, price: data.price, salePrice: data.salePrice } }));
-});
-app.post('/api/admin/stock/import', adminAuth, async (req, res) => {
-  const data = z.object({ productId: z.string(), items: z.array(z.string().min(1)).min(1).max(1000) }).parse(req.body);
-  const result = await prisma.stockItem.createMany({ data: data.items.map(payload => ({ productId: data.productId, payload })) });
-  res.json({ imported: result.count });
-});
-
-// Xuất danh mục & sản phẩm ra file products.json cho GitHub Pages chạy không cần tunnel/VPS
-app.post('/api/admin/export-githubpage', adminAuth, async (_req, res) => {
+// Hàm xuất file products.json đồng bộ cho cả frontend và GitHub Pages
+async function exportGithubProducts() {
   try {
     const [categories, products] = await Promise.all([
       prisma.category.findMany({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } }),
       prisma.product.findMany({ where: { isActive: true }, include: { category: true }, orderBy: { createdAt: 'desc' } })
     ]);
     const data = {
-      botUsername: process.env.TELEGRAM_BOT_USERNAME || 'TaiNguyenGiaReBot',
+      botUsername: (process.env.TELEGRAM_BOT_USERNAME || 'tainguyenhai1110_bot').replace('@', ''),
       bankConfig: {
         bankId: process.env.VIETQR_BANK_ID || '970436',
-        accountNo: process.env.VIETQR_ACCOUNT_NO || process.env.VIETQR_ACCOUNT_NUMBER || '',
-        accountName: process.env.VIETQR_ACCOUNT_NAME || ''
+        accountNo: process.env.VIETQR_ACCOUNT_NO || process.env.VIETQR_ACCOUNT_NUMBER || 'HAI100TR',
+        accountName: process.env.VIETQR_ACCOUNT_NAME || 'NGUYEN HOANG HAI'
       },
       categories,
       products
     };
     const fs = await import('node:fs/promises');
-    await fs.writeFile(path.resolve(__dirname, '../../frontend/public/products.json'), JSON.stringify(data, null, 2));
-    await fs.writeFile(path.resolve(__dirname, '../../githubpage/products.json'), JSON.stringify(data, null, 2));
-    res.json({ ok: true, count: products.length, message: 'Đã xuất thành công sản phẩm ra githubpage/products.json' });
-  } catch (e) {
-    res.status(500).json({ error: (e as Error).message });
+    await fs.writeFile(path.resolve(__dirname, '../../frontend/public/products.json'), JSON.stringify(data, null, 2)).catch(() => {});
+    await fs.writeFile(path.resolve(__dirname, '../../githubpage/products.json'), JSON.stringify(data, null, 2)).catch(() => {});
+    return true;
+  } catch (err) {
+    console.error('Lỗi exportGithubProducts:', err);
+    return false;
+  }
+}
+
+// ============================================================
+// ADMIN DASHBOARD APIS (Quản lý Sản phẩm, Người dùng, Đơn hàng)
+// ============================================================
+
+// 1. Thống kê tổng quan Overview
+app.get('/api/admin/overview', adminAuth, async (_req, res) => {
+  const [usersCount, ordersCount, productsCount, stockAvailableCount, depositsPaid, deliveredOrders] = await Promise.all([
+    prisma.user.count(),
+    prisma.order.count(),
+    prisma.product.count({ where: { isActive: true } }),
+    prisma.stockItem.count({ where: { status: 'AVAILABLE' } }),
+    prisma.deposit.aggregate({ where: { status: 'PAID' }, _sum: { amount: true } }),
+    prisma.order.aggregate({ where: { status: 'DELIVERED' }, _sum: { total: true } })
+  ]);
+  const totalRevenue = (depositsPaid._sum.amount || 0) + (deliveredOrders._sum.total || 0);
+  res.json({
+    users: usersCount,
+    orders: ordersCount,
+    products: productsCount,
+    availableStock: stockAvailableCount,
+    revenue: totalRevenue,
+    deposited: depositsPaid._sum.amount || 0
+  });
+});
+
+// 2. Quản lý Sản phẩm
+app.get('/api/admin/products', adminAuth, async (_req, res) => {
+  const products = await prisma.product.findMany({
+    include: {
+      category: true,
+      _count: {
+        select: {
+          stockItems: { where: { status: 'AVAILABLE' } },
+          orderItems: true
+        }
+      }
+    },
+    orderBy: { createdAt: 'desc' }
+  });
+  res.json(products);
+});
+
+app.post('/api/admin/products', adminAuth, async (req, res) => {
+  try {
+    const data = z.object({
+      categoryId: z.string().min(1),
+      name: z.string().min(1),
+      description: z.string().optional(),
+      price: z.number().positive(),
+      salePrice: z.number().positive().optional().nullable(),
+      imageUrl: z.string().optional().nullable(),
+      stockItemsText: z.string().optional()
+    }).parse(req.body);
+
+    const product = await prisma.product.create({
+      data: {
+        name: data.name,
+        categoryId: data.categoryId,
+        price: data.price,
+        salePrice: data.salePrice || null,
+        description: data.description || null,
+        imageUrl: data.imageUrl || null,
+        isActive: true
+      }
+    });
+
+    if (data.stockItemsText && data.stockItemsText.trim()) {
+      const lines = data.stockItemsText.split('\n').map(l => l.trim()).filter(Boolean);
+      if (lines.length > 0) {
+        await prisma.stockItem.createMany({
+          data: lines.map(payload => ({ productId: product.id, payload }))
+        });
+      }
+    }
+
+    await exportGithubProducts();
+    res.json(product);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Lỗi thêm sản phẩm' });
+  }
+});
+
+app.put('/api/admin/products/:id', adminAuth, async (req, res) => {
+  try {
+    const id = String(req.params.id);
+    const data = req.body;
+    const updated = await prisma.product.update({
+      where: { id },
+      data: {
+        name: data.name !== undefined ? data.name : undefined,
+        categoryId: data.categoryId !== undefined ? data.categoryId : undefined,
+        price: data.price !== undefined ? Number(data.price) : undefined,
+        salePrice: data.salePrice !== undefined ? (data.salePrice ? Number(data.salePrice) : null) : undefined,
+        description: data.description !== undefined ? data.description : undefined,
+        imageUrl: data.imageUrl !== undefined ? data.imageUrl : undefined,
+        isActive: data.isActive !== undefined ? Boolean(data.isActive) : undefined
+      }
+    });
+    await exportGithubProducts();
+    res.json(updated);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Lỗi cập nhật sản phẩm' });
+  }
+});
+
+app.delete('/api/admin/products/:id', adminAuth, async (req, res) => {
+  try {
+    const id = String(req.params.id);
+    await prisma.stockItem.deleteMany({ where: { productId: id, status: 'AVAILABLE' } }).catch(() => {});
+    try {
+      await prisma.product.delete({ where: { id } });
+    } catch {
+      await prisma.product.update({ where: { id }, data: { isActive: false } });
+    }
+    await exportGithubProducts();
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Lỗi xoá sản phẩm' });
+  }
+});
+
+app.post('/api/admin/products/:id/stock', adminAuth, async (req, res) => {
+  try {
+    const id = String(req.params.id);
+    const { items, text } = req.body;
+    let list: string[] = [];
+    if (Array.isArray(items)) {
+      list = items.map(s => String(s).trim()).filter(Boolean);
+    } else if (typeof text === 'string') {
+      list = text.split('\n').map(s => s.trim()).filter(Boolean);
+    }
+    if (list.length === 0) return res.status(400).json({ error: 'Danh sách key trống' });
+
+    const result = await prisma.stockItem.createMany({
+      data: list.map(payload => ({ productId: id, payload }))
+    });
+    res.json({ imported: result.count });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Lỗi nhập kho sản phẩm' });
+  }
+});
+
+// 3. Quản lý Người dùng (+ - Tiền, Khoá, Xoá vi phạm)
+app.get('/api/admin/users', adminAuth, async (_req, res) => {
+  const users = await prisma.user.findMany({
+    include: {
+      _count: {
+        select: { orders: true, deposits: true }
+      },
+      orders: {
+        where: { status: 'DELIVERED' },
+        select: { total: true }
+      }
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 300
+  });
+
+  const formatted = users.map(u => ({
+    id: u.id,
+    telegramId: u.telegramId,
+    username: u.username,
+    firstName: u.firstName,
+    lastName: u.lastName,
+    photoUrl: u.photoUrl,
+    balance: u.balance,
+    isBlocked: u.isBlocked,
+    createdAt: u.createdAt,
+    orderCount: u._count.orders,
+    depositCount: u._count.deposits,
+    totalSpent: u.orders.reduce((sum, o) => sum + Number(o.total), 0)
+  }));
+
+  res.json(formatted);
+});
+
+// Cộng / Trừ tiền người dùng
+app.post('/api/admin/users/:id/balance', adminAuth, async (req, res) => {
+  try {
+    const userId = String(req.params.id);
+    const { amount, type, note } = z.object({
+      amount: z.number().positive(),
+      type: z.enum(['ADD', 'SUBTRACT']),
+      note: z.string().optional()
+    }).parse(req.body);
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(404).json({ error: 'Người dùng không tồn tại' });
+
+    const newBalance = type === 'ADD' ? (user.balance + amount) : Math.max(0, user.balance - amount);
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: { balance: newBalance }
+    });
+
+    await prisma.transaction.create({
+      data: {
+        userId: user.id,
+        type: type === 'ADD' ? 'ADMIN_ADD' : 'ADMIN_SUBTRACT',
+        amount: type === 'ADD' ? amount : -amount,
+        note: note || `Admin điều chỉnh ${type === 'ADD' ? 'cộng' : 'trừ'} tiền`
+      }
+    });
+
+    // Thông báo tức thì qua Telegram bot cho người dùng
+    if (bot && user.telegramId) {
+      const actionText = type === 'ADD' ? 'được CỘNG' : 'bị TRỪ';
+      const emoji = type === 'ADD' ? '🎉' : '💸';
+      const msg =
+        `${emoji} <b>BIẾN ĐỘNG SỐ DƯ TÀI KHOẢN</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `Tài khoản của bạn vừa ${actionText}: <b>${type === 'ADD' ? '+' : '-'}${amount.toLocaleString('vi-VN')}đ</b>\n` +
+        `👛 Số dư hiện tại: <b>${newBalance.toLocaleString('vi-VN')}đ</b>\n` +
+        `📝 Lý do: <i>${note || 'Hệ thống Admin điều chỉnh số dư'}</i>`;
+      await bot.telegram.sendMessage(user.telegramId, msg, { parse_mode: 'HTML' }).catch(() => {});
+    }
+
+    res.json({ ok: true, user: updated });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Lỗi cập nhật số dư' });
+  }
+});
+
+// Khoá / Mở khoá tài khoản
+app.post('/api/admin/users/:id/toggle-block', adminAuth, async (req, res) => {
+  try {
+    const userId = String(req.params.id);
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(404).json({ error: 'Người dùng không tồn tại' });
+
+    const isBlocked = !user.isBlocked;
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: { isBlocked }
+    });
+
+    if (bot && user.telegramId && isBlocked) {
+      await bot.telegram.sendMessage(
+        user.telegramId,
+        `⚠️ <b>THÔNG BÁO TẠM KHOÁ TÀI KHOẢN</b>\n━━━━━━━━━━━━━━━━━━━━\nTài khoản của bạn đã bị Admin tạm khoá do vi phạm quy định sử dụng dịch vụ!`,
+        { parse_mode: 'HTML' }
+      ).catch(() => {});
+    }
+
+    res.json({ ok: true, isBlocked: updated.isBlocked });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Lỗi thao tác khoá tài khoản' });
+  }
+});
+
+// Xoá vĩnh viễn tài khoản người vi phạm
+app.delete('/api/admin/users/:id', adminAuth, async (req, res) => {
+  try {
+    const userId = String(req.params.id);
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(404).json({ error: 'Người dùng không tồn tại' });
+
+    await prisma.transaction.deleteMany({ where: { userId } }).catch(() => {});
+    await prisma.deposit.deleteMany({ where: { userId } }).catch(() => {});
+    const orders = await prisma.order.findMany({ where: { userId } });
+    for (const o of orders) {
+      await prisma.orderItem.deleteMany({ where: { orderId: o.id } }).catch(() => {});
+    }
+    await prisma.order.deleteMany({ where: { userId } }).catch(() => {});
+    await prisma.user.delete({ where: { id: userId } });
+
+    res.json({ ok: true, message: `Đã xoá tài khoản @${user.username || user.telegramId}` });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Lỗi xoá tài khoản' });
+  }
+});
+
+// 4. Quản lý Đơn hàng (Xem, Thêm đơn hàng, Cập nhật trạng thái)
+app.get('/api/admin/orders', adminAuth, async (_req, res) => {
+  const orders = await prisma.order.findMany({
+    include: {
+      user: true,
+      items: {
+        include: { product: true }
+      }
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 300
+  });
+  res.json(orders);
+});
+
+// Thêm đơn hàng thủ công từ Admin
+app.post('/api/admin/orders', adminAuth, async (req, res) => {
+  try {
+    const { telegramId, productId, total, deliveredKey, status } = z.object({
+      telegramId: z.string().min(1),
+      productId: z.string().min(1),
+      total: z.number().nonnegative().optional(),
+      deliveredKey: z.string().optional(),
+      status: z.enum(['DELIVERED', 'PENDING', 'CANCELLED']).default('DELIVERED')
+    }).parse(req.body);
+
+    const product = await prisma.product.findUnique({ where: { id: productId } });
+    if (!product) return res.status(404).json({ error: 'Sản phẩm không tồn tại' });
+
+    let user = await prisma.user.findUnique({ where: { telegramId } });
+    if (!user) {
+      user = await prisma.user.create({
+        data: { telegramId, firstName: `Khách ${telegramId}`, balance: 0 }
+      });
+    }
+
+    const orderTotal = total !== undefined ? total : (product.salePrice || product.price);
+    const code = `OD${Date.now().toString(36).toUpperCase()}`;
+
+    let keyToDeliver = deliveredKey?.trim() || '';
+    if (!keyToDeliver && status === 'DELIVERED') {
+      const stock = await prisma.stockItem.findFirst({
+        where: { productId: product.id, status: 'AVAILABLE' }
+      });
+      if (stock) {
+        keyToDeliver = stock.payload;
+        await prisma.stockItem.update({
+          where: { id: stock.id },
+          data: { status: 'SOLD', soldAt: new Date() }
+        });
+      }
+    }
+
+    const order = await prisma.order.create({
+      data: {
+        code,
+        userId: user.id,
+        total: orderTotal,
+        status,
+        items: {
+          create: {
+            productId: product.id,
+            quantity: 1,
+            unitPrice: orderTotal,
+            delivered: keyToDeliver || null
+          }
+        }
+      },
+      include: { items: { include: { product: true } }, user: true }
+    });
+
+    // Gửi thông báo & key qua Telegram cho khách hàng
+    if (bot && user.telegramId && status === 'DELIVERED' && keyToDeliver) {
+      const deliveryMsg =
+        `🎁 <b>ĐƠN HÀNG ĐƯỢC CẤP TỪ ADMIN SHOP HAI1110#</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `📦 <b>Sản phẩm:</b> ${product.name}\n` +
+        `🔖 <b>Mã đơn:</b> <code>${code}</code>\n` +
+        `💰 <b>Giá trị:</b> ${orderTotal.toLocaleString('vi-VN')}đ\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `🔑 <b>THÔNG TIN BÀN GIAO / KEY BẢN QUYỀN:</b>\n` +
+        `<code>${keyToDeliver}</code>\n\n` +
+        `<i>Chúc bạn sử dụng dịch vụ vui vẻ!</i>`;
+      await bot.telegram.sendMessage(user.telegramId, deliveryMsg, { parse_mode: 'HTML' }).catch(() => {});
+    }
+
+    res.json({ ok: true, order });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Lỗi thêm đơn hàng thủ công' });
+  }
+});
+
+// Cập nhật trạng thái đơn hàng (DELIVERED, PENDING, CANCELLED, REFUNDED)
+app.patch('/api/admin/orders/:id/status', adminAuth, async (req, res) => {
+  try {
+    const id = String(req.params.id);
+    const { status, refund } = z.object({
+      status: z.enum(['DELIVERED', 'PENDING', 'CANCELLED', 'REFUNDED']),
+      refund: z.boolean().optional()
+    }).parse(req.body);
+
+    const order = await prisma.order.findUnique({ where: { id }, include: { user: true } });
+    if (!order) return res.status(404).json({ error: 'Đơn hàng không tồn tại' });
+
+    const orderUser = (order as any).user;
+    if (refund && order.status !== 'REFUNDED' && orderUser) {
+      await prisma.user.update({
+        where: { id: order.userId },
+        data: { balance: { increment: order.total } }
+      });
+      await prisma.transaction.create({
+        data: {
+          userId: order.userId,
+          type: 'REFUND',
+          amount: order.total,
+          note: `Hoàn tiền đơn hàng #${order.code}`
+        }
+      });
+      if (bot && orderUser.telegramId) {
+        await bot.telegram.sendMessage(
+          orderUser.telegramId,
+          `💸 <b>THÔNG BÁO HOÀN TIỀN ĐƠN HÀNG #${order.code}</b>\n━━━━━━━━━━━━━━━━━━━━\nSố tiền: <b>+${order.total.toLocaleString('vi-VN')}đ</b> đã được hoàn lại vào số dư ví của bạn!`,
+          { parse_mode: 'HTML' }
+        ).catch(() => {});
+      }
+    }
+
+    const updated = await prisma.order.update({
+      where: { id },
+      data: { status }
+    });
+
+    res.json(updated);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Lỗi cập nhật trạng thái đơn' });
+  }
+});
+
+app.post('/api/admin/categories', adminAuth, async (req, res) => {
+  const data = z.object({ name: z.string().min(1), slug: z.string().min(1).regex(/^[a-z0-9-]+$/), description: z.string().optional() }).parse(req.body);
+  const cat = await prisma.category.create({ data });
+  await exportGithubProducts();
+  res.json(cat);
+});
+
+// Xuất danh mục & sản phẩm ra file products.json cho GitHub Pages chạy không cần tunnel/VPS
+app.post('/api/admin/export-githubpage', adminAuth, async (_req, res) => {
+  const ok = await exportGithubProducts();
+  if (ok) {
+    res.json({ ok: true, message: 'Đã xuất thành công sản phẩm ra githubpage/products.json' });
+  } else {
+    res.status(500).json({ error: 'Lỗi xuất file products.json' });
   }
 });
 
@@ -1630,6 +2044,158 @@ if (botToken) {
   bot.command(['me', 'vi', 'taikhoan', 'hoso'], ctx => sendProfileInfo(ctx));
   bot.command('orders', ctx => sendOrderHistory(ctx));
   bot.command('support', ctx => sendSupport(ctx));
+
+  const isBotAdmin = (ctx: any) => {
+    const adminIds = ['6632274262', (process.env.ADMIN_TELEGRAM_ID || '').replace('@', '')].filter(Boolean);
+    return adminIds.includes(String(ctx.from?.id));
+  };
+
+  // Lệnh /admin hoặc /dashboard trong Bot
+  bot.command(['admin', 'dashboard', 'quanly'], async ctx => {
+    if (!isBotAdmin(ctx)) return ctx.reply('⛔ Bạn không có quyền truy cập menu Quản trị viên!');
+    
+    const [uCount, oCount, pCount, stockCount, depSum] = await Promise.all([
+      prisma.user.count(),
+      prisma.order.count(),
+      prisma.product.count({ where: { isActive: true } }),
+      prisma.stockItem.count({ where: { status: 'AVAILABLE' } }),
+      prisma.deposit.aggregate({ where: { status: 'PAID' }, _sum: { amount: true } })
+    ]);
+
+    const text =
+      `⚡ <b>BẢNG ĐIỀU KHIỂN QUẢN TRỊ ADMIN (Shop Hai1110#)</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `👥 <b>Tổng khách hàng:</b> ${uCount} người\n` +
+      `📦 <b>Tổng đơn hàng:</b> ${oCount} đơn\n` +
+      `🛍 <b>Sản phẩm đang bán:</b> ${pCount} món\n` +
+      `🔑 <b>Key tồn kho sẵn sàng:</b> ${stockCount} key\n` +
+      `💰 <b>Tổng tiền đã nạp:</b> ${(depSum._sum.amount || 0).toLocaleString('vi-VN')}đ\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `<b>CÁC LỆNH NHANH CHO ADMIN:</b>\n` +
+      `➕ <code>/congtien [telegram_id] [số_tiền]</code>\n` +
+      `➖ <code>/trutien [telegram_id] [số_tiền]</code>\n` +
+      `🚫 <code>/xoatk [telegram_id]</code>\n` +
+      `🎁 <code>/themdon [telegram_id] [mã_sp] [nội_dung_key]</code>\n\n` +
+      `<i>Hoặc bấm nút bên dưới để mở Dashboard trên Mini App!</i>`;
+
+    return ctx.reply(text, {
+      parse_mode: 'HTML',
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🖥️ Mở Dashboard Quản Trị Trực Quan', web_app: { url: 'https://haiempirestore.github.io/bottesss/' } }]
+        ]
+      }
+    });
+  });
+
+  // Lệnh trừ tiền: /trutien [telegram_id] [amount]
+  bot.command(['trutien', 'subbalance'], async ctx => {
+    if (!isBotAdmin(ctx)) return;
+    const parts = (ctx.message as any).text.split(' ').filter(Boolean);
+    const targetTeleId = parts[1];
+    const amount = Number(parts[2]);
+    if (!targetTeleId || isNaN(amount) || amount <= 0) {
+      return ctx.reply('⚠️ Cú pháp: <code>/trutien [telegram_id] [số_tiền]</code>\nVí dụ: <code>/trutien 6632274262 20000</code>', { parse_mode: 'HTML' });
+    }
+    const user = await prisma.user.findUnique({ where: { telegramId: targetTeleId } });
+    if (!user) return ctx.reply(`❌ Không tìm thấy người dùng có ID ${targetTeleId}`);
+
+    const newBal = Math.max(0, user.balance - amount);
+    await prisma.user.update({ where: { id: user.id }, data: { balance: newBal } });
+    await prisma.transaction.create({
+      data: { userId: user.id, type: 'ADMIN_SUBTRACT', amount: -amount, note: 'Admin trừ tiền qua Telegram Bot' }
+    });
+
+    await ctx.reply(`✅ Đã trừ <b>-${amount.toLocaleString('vi-VN')}đ</b> của user <code>${targetTeleId}</code> (@${user.username || 'N/A'}).\n👛 Số dư mới: <b>${newBal.toLocaleString('vi-VN')}đ</b>`, { parse_mode: 'HTML' });
+
+    await ctx.telegram.sendMessage(
+      targetTeleId,
+      `💸 <b>BIẾN ĐỘNG SỐ DƯ</b>\n━━━━━━━━━━━━━━━━━━━━\nTài khoản của bạn vừa bị trừ: <b>-${amount.toLocaleString('vi-VN')}đ</b>\n👛 Số dư hiện tại: <b>${newBal.toLocaleString('vi-VN')}đ</b>`,
+      { parse_mode: 'HTML' }
+    ).catch(() => {});
+  });
+
+  // Lệnh xoá tài khoản vi phạm: /xoatk [telegram_id]
+  bot.command(['xoatk', 'deletetk', 'ban'], async ctx => {
+    if (!isBotAdmin(ctx)) return;
+    const parts = (ctx.message as any).text.split(' ').filter(Boolean);
+    const targetTeleId = parts[1];
+    if (!targetTeleId) {
+      return ctx.reply('⚠️ Cú pháp: <code>/xoatk [telegram_id]</code>\nVí dụ: <code>/xoatk 6632274262</code>', { parse_mode: 'HTML' });
+    }
+    const user = await prisma.user.findUnique({ where: { telegramId: targetTeleId } });
+    if (!user) return ctx.reply(`❌ Không tìm thấy tài khoản có Telegram ID ${targetTeleId}`);
+
+    await prisma.transaction.deleteMany({ where: { userId: user.id } }).catch(() => {});
+    await prisma.deposit.deleteMany({ where: { userId: user.id } }).catch(() => {});
+    const orders = await prisma.order.findMany({ where: { userId: user.id } });
+    for (const o of orders) {
+      await prisma.orderItem.deleteMany({ where: { orderId: o.id } }).catch(() => {});
+    }
+    await prisma.order.deleteMany({ where: { userId: user.id } }).catch(() => {});
+    await prisma.user.delete({ where: { id: user.id } });
+
+    await ctx.reply(`🗑️ Đã xoá vĩnh viễn tài khoản người vi phạm: ID <code>${targetTeleId}</code> (@${user.username || 'N/A'}) cùng toàn bộ dữ liệu liên quan!`, { parse_mode: 'HTML' });
+  });
+
+  // Lệnh thêm đơn hàng nhanh: /themdon [telegram_id] [productId] [key]
+  bot.command(['themdon', 'addorder'], async ctx => {
+    if (!isBotAdmin(ctx)) return;
+    const parts = (ctx.message as any).text.split(' ').filter(Boolean);
+    const targetTeleId = parts[1];
+    const productId = parts[2];
+    const key = parts.slice(3).join(' ');
+
+    if (!targetTeleId || !productId) {
+      return ctx.reply('⚠️ Cú pháp: <code>/themdon [telegram_id] [mã_sp_hoặc_tên] [key_bàn_giao]</code>', { parse_mode: 'HTML' });
+    }
+
+    const product = await prisma.product.findFirst({
+      where: { OR: [{ id: productId }, { name: { contains: productId } }] }
+    });
+    if (!product) return ctx.reply(`❌ Không tìm thấy sản phẩm "${productId}"`);
+
+    let user = await prisma.user.findUnique({ where: { telegramId: targetTeleId } });
+    if (!user) {
+      user = await prisma.user.create({ data: { telegramId: targetTeleId, firstName: `Khách ${targetTeleId}`, balance: 0 } });
+    }
+
+    const code = `OD${Date.now().toString(36).toUpperCase()}`;
+    const price = product.salePrice || product.price;
+
+    await prisma.order.create({
+      data: {
+        code,
+        userId: user.id,
+        total: price,
+        status: 'DELIVERED',
+        items: {
+          create: {
+            productId: product.id,
+            quantity: 1,
+            unitPrice: price,
+            delivered: key || 'Đã kích hoạt theo yêu cầu'
+          }
+        }
+      }
+    });
+
+    await ctx.reply(`✅ Đã tạo đơn thành công mã <code>${code}</code> cho user <code>${targetTeleId}</code>!`, { parse_mode: 'HTML' });
+
+    if (key) {
+      await ctx.telegram.sendMessage(
+        targetTeleId,
+        `🎁 <b>ĐƠN HÀNG ĐƯỢC CẤP TỪ ADMIN SHOP HAI1110#</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `📦 <b>Sản phẩm:</b> ${product.name}\n` +
+        `🔖 <b>Mã đơn:</b> <code>${code}</code>\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `🔑 <b>KEY / TÀI KHOẢN BÀN GIAO:</b>\n` +
+        `<code>${key}</code>`,
+        { parse_mode: 'HTML' }
+      ).catch(() => {});
+    }
+  });
 
   // Lệnh hỗ trợ cộng tiền ví nhanh khi thử nghiệm
   bot.command(['congtien', 'topup'], async ctx => {

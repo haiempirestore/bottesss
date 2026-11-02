@@ -30,7 +30,17 @@ import {
   Download,
   AlertCircle,
   KeyRound,
-  Mail
+  Mail,
+  Users,
+  DollarSign,
+  Trash2,
+  Edit3,
+  CheckCircle2,
+  Ban,
+  Unlock,
+  Send,
+  TrendingUp,
+  Box
 } from 'lucide-react';
 
 declare global {
@@ -264,12 +274,40 @@ export default function App() {
   const [fbUrl, setFbUrl] = useState('');
   const [fbUid, setFbUid] = useState<string | null>(null);
 
-  // Admin form
+  // Admin Dashboard States
+  const [adminTab, setAdminTab] = useState<'overview' | 'products' | 'users' | 'orders'>('overview');
+  const [adminOverview, setAdminOverview] = useState<any>(null);
+  const [adminProducts, setAdminProducts] = useState<any[]>([]);
+  const [adminUsers, setAdminUsers] = useState<any[]>([]);
+  const [adminOrders, setAdminOrders] = useState<any[]>([]);
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [adminSearchUser, setAdminSearchUser] = useState('');
+  const [adminSearchOrder, setAdminSearchOrder] = useState('');
+  const [adminKey, setAdminKey] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('ADMIN_KEY') || 'hai1110' : 'hai1110'));
+
+  // Admin sub-modals & forms
+  const [balanceModal, setBalanceModal] = useState<{ user: any; type: 'ADD' | 'SUBTRACT'; amount: string; note: string } | null>(null);
+  const [stockModal, setStockModal] = useState<{ product: any; text: string } | null>(null);
+  const [productFormOpen, setProductFormOpen] = useState(false);
+  const [orderFormOpen, setOrderFormOpen] = useState(false);
+
+  // Form states for Product Add/Edit
+  const [editProdId, setEditProdId] = useState<string | null>(null);
   const [newCatName, setNewCatName] = useState('');
   const [newCatSlug, setNewCatSlug] = useState('');
   const [newProdName, setNewProdName] = useState('');
   const [newProdPrice, setNewProdPrice] = useState('50000');
+  const [newProdSalePrice, setNewProdSalePrice] = useState('');
   const [newProdCatId, setNewProdCatId] = useState('');
+  const [newProdDesc, setNewProdDesc] = useState('');
+  const [newProdImg, setNewProdImg] = useState('');
+  const [newProdStock, setNewProdStock] = useState('');
+
+  // Form states for Manual Order
+  const [manualTeleId, setManualTeleId] = useState('');
+  const [manualProdId, setManualProdId] = useState('');
+  const [manualPrice, setManualPrice] = useState('');
+  const [manualKey, setManualKey] = useState('');
 
   // Orders tab filter
   const [orderFilter, setOrderFilter] = useState<'all' | 'warranty'>('all');
@@ -451,14 +489,246 @@ export default function App() {
     }, 1800);
   };
 
+  // ============================================================
+  // ADMIN DASHBOARD HANDLERS (Sản phẩm, Người dùng, Đơn hàng)
+  // ============================================================
+  const adminBaseUrl = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'http://localhost:4000');
+  const getAdminHeaders = () => ({
+    'Content-Type': 'application/json',
+    'x-admin-key': adminKey || 'hai1110'
+  });
+
+  const loadAdminData = async () => {
+    setAdminLoading(true);
+    try {
+      const [ov, prods, usrs, ords] = await Promise.all([
+        fetch(`${adminBaseUrl}/api/admin/overview`, { headers: getAdminHeaders() }).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(`${adminBaseUrl}/api/admin/products`, { headers: getAdminHeaders() }).then(r => r.ok ? r.json() : []).catch(() => []),
+        fetch(`${adminBaseUrl}/api/admin/users`, { headers: getAdminHeaders() }).then(r => r.ok ? r.json() : []).catch(() => []),
+        fetch(`${adminBaseUrl}/api/admin/orders`, { headers: getAdminHeaders() }).then(r => r.ok ? r.json() : []).catch(() => [])
+      ]);
+      if (ov) setAdminOverview(ov);
+      if (Array.isArray(prods)) setAdminProducts(prods);
+      if (Array.isArray(usrs)) setAdminUsers(usrs);
+      if (Array.isArray(ords)) setAdminOrders(ords);
+    } finally {
+      setAdminLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (adminModalOpen) {
+      loadAdminData();
+    }
+  }, [adminModalOpen]);
+
+  // Thêm / Cập nhật sản phẩm
+  const handleSaveProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const payload: any = {
+        name: newProdName,
+        categoryId: newProdCatId || categories[0]?.id,
+        price: Number(newProdPrice),
+        salePrice: newProdSalePrice ? Number(newProdSalePrice) : null,
+        description: newProdDesc || null,
+        imageUrl: newProdImg || null,
+        stockItemsText: newProdStock || undefined
+      };
+
+      let res;
+      if (editProdId) {
+        res = await fetch(`${adminBaseUrl}/api/admin/products/${editProdId}`, {
+          method: 'PUT',
+          headers: getAdminHeaders(),
+          body: JSON.stringify(payload)
+        }).then(r => r.json());
+      } else {
+        res = await fetch(`${adminBaseUrl}/api/admin/products`, {
+          method: 'POST',
+          headers: getAdminHeaders(),
+          body: JSON.stringify(payload)
+        }).then(r => r.json());
+      }
+
+      if (res.error) throw new Error(res.error);
+      showToast(editProdId ? '✅ Đã cập nhật sản phẩm!' : '✅ Đã thêm sản phẩm mới thành công!');
+      setProductFormOpen(false);
+      setEditProdId(null);
+      setNewProdName('');
+      setNewProdDesc('');
+      setNewProdImg('');
+      setNewProdStock('');
+      setNewProdSalePrice('');
+      loadAdminData();
+      loadData();
+    } catch (err: any) {
+      showToast(err.message || 'Lỗi lưu sản phẩm');
+    }
+  };
+
+  // Xoá sản phẩm
+  const handleDeleteProduct = async (id: string, name: string) => {
+    if (!window.confirm(`Bạn có chắc muốn xoá sản phẩm "${name}"?`)) return;
+    try {
+      const res = await fetch(`${adminBaseUrl}/api/admin/products/${id}`, {
+        method: 'DELETE',
+        headers: getAdminHeaders()
+      }).then(r => r.json());
+      if (res.error) throw new Error(res.error);
+      showToast('🗑️ Đã xoá sản phẩm thành công!');
+      loadAdminData();
+      loadData();
+    } catch (err: any) {
+      showToast(err.message || 'Lỗi xoá sản phẩm');
+    }
+  };
+
+  // Bật / Tắt sản phẩm
+  const handleToggleProduct = async (id: string, currentActive: boolean) => {
+    try {
+      await fetch(`${adminBaseUrl}/api/admin/products/${id}`, {
+        method: 'PUT',
+        headers: getAdminHeaders(),
+        body: JSON.stringify({ isActive: !currentActive })
+      });
+      showToast(!currentActive ? '✅ Đã bật bán sản phẩm!' : '⏸️ Đã tạm ngưng bán sản phẩm!');
+      loadAdminData();
+      loadData();
+    } catch (err: any) {
+      showToast(err.message || 'Lỗi cập nhật');
+    }
+  };
+
+  // Nhập kho Key sản phẩm
+  const handleImportStock = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stockModal) return;
+    try {
+      const res = await fetch(`${adminBaseUrl}/api/admin/products/${stockModal.product.id}/stock`, {
+        method: 'POST',
+        headers: getAdminHeaders(),
+        body: JSON.stringify({ text: stockModal.text })
+      }).then(r => r.json());
+      if (res.error) throw new Error(res.error);
+      showToast(`📦 Đã nhập thành công ${res.imported} key vào kho!`);
+      setStockModal(null);
+      loadAdminData();
+    } catch (err: any) {
+      showToast(err.message || 'Lỗi nhập kho');
+    }
+  };
+
+  // Cộng / Trừ tiền người dùng
+  const handleAdjustBalance = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!balanceModal) return;
+    try {
+      const num = Number(balanceModal.amount);
+      if (isNaN(num) || num <= 0) return showToast('Vui lòng nhập số tiền hợp lệ (> 0)');
+      const res = await fetch(`${adminBaseUrl}/api/admin/users/${balanceModal.user.id}/balance`, {
+        method: 'POST',
+        headers: getAdminHeaders(),
+        body: JSON.stringify({
+          amount: num,
+          type: balanceModal.type,
+          note: balanceModal.note || `Admin ${balanceModal.type === 'ADD' ? 'cộng' : 'trừ'} tiền`
+        })
+      }).then(r => r.json());
+      if (res.error) throw new Error(res.error);
+      showToast(`✅ Đã ${balanceModal.type === 'ADD' ? 'cộng' : 'trừ'} ${num.toLocaleString('vi-VN')}đ thành công!`);
+      setBalanceModal(null);
+      loadAdminData();
+    } catch (err: any) {
+      showToast(err.message || 'Lỗi điều chỉnh số dư');
+    }
+  };
+
+  // Khoá / Mở khoá người dùng
+  const handleToggleBlockUser = async (userId: string) => {
+    try {
+      const res = await fetch(`${adminBaseUrl}/api/admin/users/${userId}/toggle-block`, {
+        method: 'POST',
+        headers: getAdminHeaders()
+      }).then(r => r.json());
+      if (res.error) throw new Error(res.error);
+      showToast(res.isBlocked ? '🚫 Đã khoá tài khoản người dùng!' : '🔓 Đã mở khoá tài khoản!');
+      loadAdminData();
+    } catch (err: any) {
+      showToast(err.message || 'Lỗi thao tác');
+    }
+  };
+
+  // Xoá tài khoản người vi phạm
+  const handleDeleteUser = async (userId: string, label: string) => {
+    if (!window.confirm(`⚠️ BẠN CÓ CHẮC MUỐN XOÁ VĨNH VIỄN TÀI KHOẢN "${label}"? Toàn bộ đơn hàng và lịch sử sẽ bị xoá sạch!`)) return;
+    try {
+      const res = await fetch(`${adminBaseUrl}/api/admin/users/${userId}`, {
+        method: 'DELETE',
+        headers: getAdminHeaders()
+      }).then(r => r.json());
+      if (res.error) throw new Error(res.error);
+      showToast('🗑️ Đã xoá vĩnh viễn tài khoản người vi phạm!');
+      loadAdminData();
+    } catch (err: any) {
+      showToast(err.message || 'Lỗi xoá tài khoản');
+    }
+  };
+
+  // Thêm đơn hàng thủ công
+  const handleCreateManualOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (!manualTeleId.trim()) return showToast('Vui lòng nhập Telegram ID người nhận');
+      if (!manualProdId) return showToast('Vui lòng chọn sản phẩm');
+
+      const res = await fetch(`${adminBaseUrl}/api/admin/orders`, {
+        method: 'POST',
+        headers: getAdminHeaders(),
+        body: JSON.stringify({
+          telegramId: manualTeleId.trim(),
+          productId: manualProdId,
+          total: manualPrice ? Number(manualPrice) : undefined,
+          deliveredKey: manualKey.trim() || undefined,
+          status: 'DELIVERED'
+        })
+      }).then(r => r.json());
+      if (res.error) throw new Error(res.error);
+      showToast('🎁 Đã tạo đơn hàng & bàn giao thành công!');
+      setOrderFormOpen(false);
+      setManualTeleId('');
+      setManualKey('');
+      setManualPrice('');
+      loadAdminData();
+    } catch (err: any) {
+      showToast(err.message || 'Lỗi tạo đơn hàng');
+    }
+  };
+
+  // Hoàn tiền đơn hàng
+  const handleRefundOrder = async (orderId: string, code: string) => {
+    if (!window.confirm(`Xác nhận hoàn tiền đơn hàng #${code} về số dư của khách?`)) return;
+    try {
+      const res = await fetch(`${adminBaseUrl}/api/admin/orders/${orderId}/status`, {
+        method: 'PATCH',
+        headers: getAdminHeaders(),
+        body: JSON.stringify({ status: 'REFUNDED', refund: true })
+      }).then(r => r.json());
+      if (res.error) throw new Error(res.error);
+      showToast('💸 Đã hoàn tiền đơn hàng về ví khách thành công!');
+      loadAdminData();
+    } catch (err: any) {
+      showToast(err.message || 'Lỗi hoàn tiền');
+    }
+  };
+
   // Thêm danh mục Admin
   const handleAddCategory = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!apiUrl) return showToast('Vui lòng bật backend local để thêm');
     try {
-      const res = await fetch(`${apiUrl}/api/admin/categories`, {
+      const res = await fetch(`${adminBaseUrl}/api/admin/categories`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminHeaders(),
         body: JSON.stringify({ name: newCatName, slug: newCatSlug })
       }).then((r) => r.json());
       if (res.id) {
@@ -472,31 +742,13 @@ export default function App() {
     }
   };
 
-  // Thêm sản phẩm Admin
-  const handleAddProduct = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!apiUrl) return showToast('Vui lòng bật backend local để thêm');
-    try {
-      const res = await fetch(`${apiUrl}/api/admin/products`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ categoryId: newProdCatId, name: newProdName, price: Number(newProdPrice) })
-      }).then((r) => r.json());
-      if (res.id) {
-        showToast('✅ Đã tạo sản phẩm thành công!');
-        setNewProdName('');
-        loadData();
-      }
-    } catch (err: any) {
-      showToast(err.message || 'Lỗi thêm sản phẩm');
-    }
-  };
-
   // Xuất file tĩnh lên GitHub Pages
   const handleExportGithub = async () => {
-    if (!apiUrl) return showToast('Chỉ xuất khi chạy trên localhost máy chủ');
     try {
-      const res = await fetch(`${apiUrl}/api/admin/export-githubpage`, { method: 'POST' }).then((r) => r.json());
+      const res = await fetch(`${adminBaseUrl}/api/admin/export-githubpage`, {
+        method: 'POST',
+        headers: getAdminHeaders()
+      }).then((r) => r.json());
       showToast('✅ ' + (res.message || 'Đã xuất ra githubpage/products.json!'));
     } catch (err: any) {
       showToast(err.message || 'Lỗi xuất dữ liệu');
@@ -1520,98 +1772,672 @@ export default function App() {
       )}
 
       {/* ========================================================
-          MODAL ADMIN DASHBOARD
+          MODAL ADMIN DASHBOARD ĐẦY ĐỦ (SẢN PHẨM, NGƯỜI DÙNG, ĐƠN HÀNG)
       ======================================================== */}
       {adminModalOpen && (
         <div className="modal-overlay" onClick={() => setAdminModalOpen(false)}>
-          <div className="modal-sheet" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-sheet-admin" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3 className="modal-title">⚡ Trung Tâm Quản Trị (Admin)</h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <ShieldCheck size={22} color="var(--primary)" />
+                <h3 className="modal-title">Bảng Điều Khiển Quản Trị</h3>
+              </div>
               <button className="modal-close-btn" onClick={() => setAdminModalOpen(false)}>
                 <X size={18} />
               </button>
             </div>
 
-            <div style={{ display: 'flex', gap: 10 }}>
+            {/* Admin Nav Tabs */}
+            <div className="admin-nav-tabs">
               <button
-                className="btn-primary-pill"
-                style={{ flex: 1, padding: 10, fontSize: 12 }}
-                onClick={handleExportGithub}
+                className={`admin-nav-tab ${adminTab === 'overview' ? 'active' : ''}`}
+                onClick={() => setAdminTab('overview')}
               >
-                <Download size={14} style={{ display: 'inline', marginRight: 4 }} />
-                Xuất lên GitHub Pages
+                <TrendingUp size={14} /> Tổng quan
+              </button>
+              <button
+                className={`admin-nav-tab ${adminTab === 'products' ? 'active' : ''}`}
+                onClick={() => setAdminTab('products')}
+              >
+                <ShoppingBag size={14} /> Sản phẩm ({adminProducts.length || products.length})
+              </button>
+              <button
+                className={`admin-nav-tab ${adminTab === 'users' ? 'active' : ''}`}
+                onClick={() => setAdminTab('users')}
+              >
+                <Users size={14} /> Người dùng ({adminUsers.length})
+              </button>
+              <button
+                className={`admin-nav-tab ${adminTab === 'orders' ? 'active' : ''}`}
+                onClick={() => setAdminTab('orders')}
+              >
+                <Package size={14} /> Đơn hàng ({adminOrders.length})
               </button>
             </div>
 
-            {/* Thêm danh mục */}
-            <div className="wallet-card" style={{ gap: 8 }}>
-              <b style={{ fontSize: 13, color: '#fff' }}>Thêm danh mục mới:</b>
-              <form onSubmit={handleAddCategory} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <input
-                  type="text"
-                  className="search-input"
-                  style={{ padding: '0 12px', height: 38 }}
-                  placeholder="Tên danh mục (VD: Tài khoản AI)..."
-                  value={newCatName}
-                  onChange={(e) => setNewCatName(e.target.value)}
-                  required
-                />
-                <input
-                  type="text"
-                  className="search-input"
-                  style={{ padding: '0 12px', height: 38 }}
-                  placeholder="Slug (VD: ai-tools)..."
-                  value={newCatSlug}
-                  onChange={(e) => setNewCatSlug(e.target.value)}
-                  required
-                />
-                <button type="submit" className="btn-deposit" style={{ alignSelf: 'flex-start' }}>
-                  <Plus size={14} /> Tạo danh mục
-                </button>
-              </form>
+            {/* TAB 1: TỔNG QUAN (OVERVIEW) */}
+            {adminTab === 'overview' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div className="admin-stats-grid">
+                  <div className="admin-stat-card">
+                    <span className="admin-stat-label"><DollarSign size={13} color="var(--primary)" /> Tổng Doanh Thu</span>
+                    <span className="admin-stat-val primary">
+                      {Number(adminOverview?.revenue || 0).toLocaleString('vi-VN')} đ
+                    </span>
+                  </div>
+                  <div className="admin-stat-card">
+                    <span className="admin-stat-label"><Package size={13} color="#3b82f6" /> Đơn Hàng</span>
+                    <span className="admin-stat-val">
+                      {adminOverview?.orders || 0} đơn
+                    </span>
+                  </div>
+                  <div className="admin-stat-card">
+                    <span className="admin-stat-label"><Users size={13} color="#10b981" /> Thành Viên</span>
+                    <span className="admin-stat-val">
+                      {adminOverview?.users || 0} người
+                    </span>
+                  </div>
+                  <div className="admin-stat-card">
+                    <span className="admin-stat-label"><KeyRound size={13} color="#f59e0b" /> Key Tồn Kho</span>
+                    <span className="admin-stat-val">
+                      {adminOverview?.availableStock || 0} key
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button
+                    className="btn-primary-pill"
+                    style={{ flex: 1, padding: 10, fontSize: 12 }}
+                    onClick={handleExportGithub}
+                  >
+                    <Download size={14} style={{ display: 'inline', marginRight: 4 }} />
+                    Xuất Lên GitHub Pages
+                  </button>
+                  <button
+                    className="btn-primary-pill"
+                    style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)', flex: 1, padding: 10, fontSize: 12 }}
+                    onClick={loadAdminData}
+                  >
+                    <RefreshCw size={14} style={{ display: 'inline', marginRight: 4 }} />
+                    Làm Mới
+                  </button>
+                </div>
+
+                {/* Form thêm danh mục nhanh */}
+                <div className="admin-item-card">
+                  <b style={{ fontSize: 13, color: '#fff' }}>➕ Thêm Danh Mục Mới:</b>
+                  <form onSubmit={handleAddCategory} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input
+                        type="text"
+                        className="search-input"
+                        style={{ padding: '0 12px', height: 38, flex: 1 }}
+                        placeholder="Tên danh mục (VD: 🤖 ChatGPT & AI)..."
+                        value={newCatName}
+                        onChange={(e) => setNewCatName(e.target.value)}
+                        required
+                      />
+                      <input
+                        type="text"
+                        className="search-input"
+                        style={{ padding: '0 12px', height: 38, flex: 1 }}
+                        placeholder="Slug (VD: chatgpt)..."
+                        value={newCatSlug}
+                        onChange={(e) => setNewCatSlug(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <button type="submit" className="btn-admin-action primary" style={{ alignSelf: 'flex-start' }}>
+                      <Plus size={14} /> Tạo Danh Mục
+                    </button>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 2: QUẢN LÝ SẢN PHẨM (PRODUCTS) */}
+            {adminTab === 'products' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <b style={{ fontSize: 13, color: '#fff' }}>Danh sách sản phẩm ({adminProducts.length}):</b>
+                  <button
+                    className="btn-admin-action primary"
+                    onClick={() => {
+                      setEditProdId(null);
+                      setNewProdName('');
+                      setNewProdPrice('50000');
+                      setNewProdSalePrice('');
+                      setNewProdDesc('');
+                      setNewProdImg('');
+                      setNewProdStock('');
+                      setProductFormOpen(!productFormOpen);
+                    }}
+                  >
+                    <Plus size={14} /> {productFormOpen ? 'Đóng Form' : 'Thêm Sản Phẩm'}
+                  </button>
+                </div>
+
+                {/* Form thêm / sửa sản phẩm */}
+                {productFormOpen && (
+                  <form onSubmit={handleSaveProduct} className="admin-item-card" style={{ borderColor: 'var(--primary)' }}>
+                    <b style={{ fontSize: 14, color: 'var(--primary)' }}>
+                      {editProdId ? '✏️ Cập nhật sản phẩm' : '➕ Thêm sản phẩm mới vào Shop'}
+                    </b>
+                    <input
+                      type="text"
+                      className="search-input"
+                      style={{ padding: '0 12px', height: 38 }}
+                      placeholder="Tên sản phẩm (VD: YouTube Premium 1 Năm)..."
+                      value={newProdName}
+                      onChange={(e) => setNewProdName(e.target.value)}
+                      required
+                    />
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <select
+                        className="search-input"
+                        style={{ padding: '0 12px', height: 38, flex: 1 }}
+                        value={newProdCatId}
+                        onChange={(e) => setNewProdCatId(e.target.value)}
+                        required
+                      >
+                        <option value="">-- Chọn danh mục --</option>
+                        {categories.map((c) => (
+                          <option key={c.id || c.slug} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="number"
+                        className="search-input"
+                        style={{ padding: '0 12px', height: 38, flex: 1 }}
+                        placeholder="Giá gốc VND..."
+                        value={newProdPrice}
+                        onChange={(e) => setNewProdPrice(e.target.value)}
+                        required
+                      />
+                      <input
+                        type="number"
+                        className="search-input"
+                        style={{ padding: '0 12px', height: 38, flex: 1 }}
+                        placeholder="Giá Sale (tuỳ chọn)..."
+                        value={newProdSalePrice}
+                        onChange={(e) => setNewProdSalePrice(e.target.value)}
+                      />
+                    </div>
+                    <textarea
+                      className="search-input"
+                      style={{ padding: '8px 12px', minHeight: 60, height: 'auto', resize: 'vertical' }}
+                      placeholder="Mô tả sản phẩm, chính sách bảo hành..."
+                      value={newProdDesc}
+                      onChange={(e) => setNewProdDesc(e.target.value)}
+                    />
+                    <input
+                      type="text"
+                      className="search-input"
+                      style={{ padding: '0 12px', height: 38 }}
+                      placeholder="Link ảnh sản phẩm (tuỳ chọn)..."
+                      value={newProdImg}
+                      onChange={(e) => setNewProdImg(e.target.value)}
+                    />
+                    {!editProdId && (
+                      <div>
+                        <span style={{ fontSize: 11, color: 'var(--text-dim)', display: 'block', marginBottom: 4 }}>
+                          🔑 Nhập danh sách Key / Tài khoản kho ban đầu (mỗi dòng 1 key, tự động cấp khi khách mua):
+                        </span>
+                        <textarea
+                          className="search-input"
+                          style={{ padding: '8px 12px', minHeight: 70, height: 'auto', resize: 'vertical' }}
+                          placeholder="user1|pass1&#10;user2|pass2&#10;KEY-XYZ-123..."
+                          value={newProdStock}
+                          onChange={(e) => setNewProdStock(e.target.value)}
+                        />
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button type="submit" className="btn-admin-action primary">
+                        <Check size={14} /> {editProdId ? 'Lưu Thay Đổi' : 'Thêm Sản Phẩm Ngay'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-admin-action secondary"
+                        onClick={() => { setProductFormOpen(false); setEditProdId(null); }}
+                      >
+                        Huỷ
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {/* Danh sách sản phẩm */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '55vh', overflowY: 'auto' }}>
+                  {adminProducts.map((p) => {
+                    const price = p.salePrice || p.price;
+                    const stockCount = p._count?.stockItems ?? 0;
+                    return (
+                      <div key={p.id} className="admin-item-card">
+                        <div className="admin-item-header">
+                          <div>
+                            <b style={{ fontSize: 14, color: '#fff', display: 'block' }}>{p.name}</b>
+                            <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                              {p.category?.name || 'Chung'} • ID: <code>{p.id.slice(-6)}</code>
+                            </span>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <b style={{ color: 'var(--primary)', fontSize: 14 }}>
+                              {price.toLocaleString('vi-VN')} đ
+                            </b>
+                            <div style={{ display: 'flex', gap: 4, marginTop: 2, justifyContent: 'flex-end' }}>
+                              <span className={`badge-tag ${p.isActive ? 'green' : 'yellow'}`}>
+                                {p.isActive ? 'ĐANG BÁN' : 'TẠM TẮT'}
+                              </span>
+                              <span className={`badge-tag ${stockCount > 0 ? 'green' : 'red'}`}>
+                                {stockCount} Key
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="admin-action-btn-group">
+                          <button
+                            className="btn-admin-action primary"
+                            onClick={() => setStockModal({ product: p, text: '' })}
+                          >
+                            <Plus size={12} /> Nhập Key Kho
+                          </button>
+                          <button
+                            className={`btn-admin-action ${p.isActive ? 'secondary' : 'success'}`}
+                            onClick={() => handleToggleProduct(p.id, p.isActive)}
+                          >
+                            {p.isActive ? 'Tạm Ngưng' : 'Bật Bán'}
+                          </button>
+                          <button
+                            className="btn-admin-action secondary"
+                            onClick={() => {
+                              setEditProdId(p.id);
+                              setNewProdName(p.name);
+                              setNewProdCatId(p.categoryId);
+                              setNewProdPrice(String(p.price));
+                              setNewProdSalePrice(p.salePrice ? String(p.salePrice) : '');
+                              setNewProdDesc(p.description || '');
+                              setNewProdImg(p.imageUrl || '');
+                              setProductFormOpen(true);
+                            }}
+                          >
+                            <Edit3 size={12} /> Sửa
+                          </button>
+                          <button
+                            className="btn-admin-action danger"
+                            onClick={() => handleDeleteProduct(p.id, p.name)}
+                          >
+                            <Trash2 size={12} /> Xoá
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* TAB 3: QUẢN LÝ NGƯỜI DÙNG (+ - TIỀN, KHOÁ, XOÁ VI PHẠM) */}
+            {adminTab === 'users' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    className="search-input"
+                    style={{ height: 38, paddingLeft: 34 }}
+                    placeholder="Tìm theo tên, ID Telegram, username..."
+                    value={adminSearchUser}
+                    onChange={(e) => setAdminSearchUser(e.target.value)}
+                  />
+                  <Search size={14} style={{ position: 'absolute', left: 12, top: 12, color: 'var(--text-dim)' }} />
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '60vh', overflowY: 'auto' }}>
+                  {adminUsers
+                    .filter((u) => {
+                      const q = adminSearchUser.toLowerCase();
+                      return (
+                        !q ||
+                        u.firstName?.toLowerCase().includes(q) ||
+                        u.username?.toLowerCase().includes(q) ||
+                        u.telegramId?.includes(q)
+                      );
+                    })
+                    .map((u) => (
+                      <div key={u.id} className="admin-item-card">
+                        <div className="admin-item-header">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div style={{ width: 36, height: 36, borderRadius: '50%', overflow: 'hidden' }}>
+                              <UserAvatar name={u.firstName || u.username} photoUrl={u.photoUrl} size={36} />
+                            </div>
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <b style={{ fontSize: 13, color: '#fff' }}>{u.firstName || 'Khách hàng'}</b>
+                                {u.username && <span style={{ fontSize: 11, color: 'var(--primary)' }}>@{u.username}</span>}
+                                {u.isBlocked && <span className="badge-tag red">ĐÃ KHOÁ</span>}
+                              </div>
+                              <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                                ID: <code>{u.telegramId}</code> • Đã mua: {u.orderCount || 0} đơn
+                              </span>
+                            </div>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <span style={{ fontSize: 11, color: 'var(--text-dim)', display: 'block' }}>SỐ DƯ VÍ</span>
+                            <b style={{ fontSize: 14, color: Number(u.balance) > 0 ? '#10b981' : '#fff' }}>
+                              {Number(u.balance || 0).toLocaleString('vi-VN')} đ
+                            </b>
+                          </div>
+                        </div>
+
+                        <div className="admin-action-btn-group">
+                          <button
+                            className="btn-admin-action success"
+                            onClick={() => setBalanceModal({ user: u, type: 'ADD', amount: '50000', note: 'Admin nạp tiền' })}
+                          >
+                            <Plus size={12} /> Cộng Tiền
+                          </button>
+                          <button
+                            className="btn-admin-action danger"
+                            onClick={() => setBalanceModal({ user: u, type: 'SUBTRACT', amount: '20000', note: 'Admin trừ tiền' })}
+                          >
+                            <DollarSign size={12} /> Trừ Tiền
+                          </button>
+                          <button
+                            className={`btn-admin-action ${u.isBlocked ? 'success' : 'secondary'}`}
+                            onClick={() => handleToggleBlockUser(u.id)}
+                          >
+                            {u.isBlocked ? <Unlock size={12} /> : <Ban size={12} />}
+                            {u.isBlocked ? 'Mở Khoá' : 'Khoá'}
+                          </button>
+                          <button
+                            className="btn-admin-action danger"
+                            onClick={() => handleDeleteUser(u.id, u.firstName || u.username || u.telegramId)}
+                          >
+                            <Trash2 size={12} /> Xoá Vi Phạm
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* TAB 4: QUẢN LÝ ĐƠN HÀNG (ORDERS) */}
+            {adminTab === 'orders' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <b style={{ fontSize: 13, color: '#fff' }}>Danh sách đơn hàng ({adminOrders.length}):</b>
+                  <button
+                    className="btn-admin-action primary"
+                    onClick={() => {
+                      setManualTeleId('');
+                      setManualProdId(adminProducts[0]?.id || '');
+                      setManualPrice('');
+                      setManualKey('');
+                      setOrderFormOpen(!orderFormOpen);
+                    }}
+                  >
+                    <Plus size={14} /> {orderFormOpen ? 'Đóng Form' : 'Cấp Đơn Thủ Công'}
+                  </button>
+                </div>
+
+                {/* Form thêm đơn hàng thủ công */}
+                {orderFormOpen && (
+                  <form onSubmit={handleCreateManualOrder} className="admin-item-card" style={{ borderColor: 'var(--primary)' }}>
+                    <b style={{ fontSize: 14, color: 'var(--primary)' }}>🎁 Tạo Đơn Hàng & Bàn Giao Key Trực Tiếp</b>
+                    <input
+                      type="text"
+                      className="search-input"
+                      style={{ padding: '0 12px', height: 38 }}
+                      placeholder="Telegram ID người nhận (VD: 6632274262)..."
+                      value={manualTeleId}
+                      onChange={(e) => setManualTeleId(e.target.value)}
+                      required
+                    />
+                    <select
+                      className="search-input"
+                      style={{ padding: '0 12px', height: 38 }}
+                      value={manualProdId}
+                      onChange={(e) => setManualProdId(e.target.value)}
+                      required
+                    >
+                      <option value="">-- Chọn sản phẩm cấp đơn --</option>
+                      {adminProducts.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} ({(p.salePrice || p.price).toLocaleString('vi-VN')}đ)
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="number"
+                      className="search-input"
+                      style={{ padding: '0 12px', height: 38 }}
+                      placeholder="Tổng tiền (để trống sẽ lấy theo giá sản phẩm)..."
+                      value={manualPrice}
+                      onChange={(e) => setManualPrice(e.target.value)}
+                    />
+                    <textarea
+                      className="search-input"
+                      style={{ padding: '8px 12px', minHeight: 60, height: 'auto', resize: 'vertical' }}
+                      placeholder="Nội dung key / tài khoản bàn giao (nếu trống sẽ tự lấy 1 key từ kho)..."
+                      value={manualKey}
+                      onChange={(e) => setManualKey(e.target.value)}
+                    />
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button type="submit" className="btn-admin-action primary">
+                        <Send size={14} /> Cấp Đơn & Gửi Cho Khách
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-admin-action secondary"
+                        onClick={() => setOrderFormOpen(false)}
+                      >
+                        Huỷ
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    className="search-input"
+                    style={{ height: 38, paddingLeft: 34 }}
+                    placeholder="Tìm theo mã đơn (#OD...), tên khách..."
+                    value={adminSearchOrder}
+                    onChange={(e) => setAdminSearchOrder(e.target.value)}
+                  />
+                  <Search size={14} style={{ position: 'absolute', left: 12, top: 12, color: 'var(--text-dim)' }} />
+                </div>
+
+                {/* Danh sách đơn hàng */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '60vh', overflowY: 'auto' }}>
+                  {adminOrders
+                    .filter((o) => {
+                      const q = adminSearchOrder.toLowerCase();
+                      return (
+                        !q ||
+                        o.code?.toLowerCase().includes(q) ||
+                        o.user?.firstName?.toLowerCase().includes(q) ||
+                        o.user?.telegramId?.includes(q)
+                      );
+                    })
+                    .map((o) => {
+                      const item = o.items?.[0];
+                      const prodName = item?.product?.name || 'Sản phẩm';
+                      const delivered = item?.delivered;
+                      return (
+                        <div key={o.id} className="admin-item-card">
+                          <div className="admin-item-header">
+                            <div>
+                              <b style={{ fontSize: 13, color: '#fff' }}>#{o.code}</b>
+                              <span style={{ fontSize: 11, color: 'var(--text-dim)', display: 'block' }}>
+                                {new Date(o.createdAt).toLocaleString('vi-VN')} • Khách: {o.user?.firstName || o.user?.telegramId || 'Khách'}
+                              </span>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                              <b style={{ color: 'var(--primary)', fontSize: 14 }}>
+                                {Number(o.total).toLocaleString('vi-VN')} đ
+                              </b>
+                              <div>
+                                <span className={`badge-tag ${o.status === 'DELIVERED' ? 'green' : o.status === 'REFUNDED' ? 'yellow' : 'red'}`}>
+                                  {o.status === 'DELIVERED' ? 'ĐÃ GIAO' : o.status === 'REFUNDED' ? 'HOÀN TIỀN' : o.status}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div style={{ fontSize: 12, color: '#e2e8f0' }}>
+                            📦 <b>Sản phẩm:</b> {prodName}
+                          </div>
+
+                          {delivered && (
+                            <div className="copy-row" style={{ padding: '6px 10px', fontSize: 12 }}>
+                              <code style={{ fontSize: 12, wordBreak: 'break-all' }}>{delivered}</code>
+                              <button
+                                className="btn-buy-circle"
+                                style={{ width: 26, height: 26 }}
+                                onClick={() => copyToClipboard(delivered, 'Đã copy key!')}
+                              >
+                                <Copy size={12} />
+                              </button>
+                            </div>
+                          )}
+
+                          {o.status === 'DELIVERED' && (
+                            <div className="admin-action-btn-group">
+                              <button
+                                className="btn-admin-action danger"
+                                onClick={() => handleRefundOrder(o.id, o.code)}
+                              >
+                                <RotateCcw size={12} /> Hoàn Tiền Về Ví Khách
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* POPUP SUB-MODAL: CỘNG / TRỪ TIỀN NGƯỜI DÙNG */}
+      {balanceModal && (
+        <div className="modal-overlay" style={{ zIndex: 1100 }} onClick={() => setBalanceModal(null)}>
+          <div className="modal-sheet" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 400 }}>
+            <div className="modal-header">
+              <h3 className="modal-title">
+                {balanceModal.type === 'ADD' ? '➕ Cộng Tiền Vào Ví' : '➖ Trừ Tiền Khỏi Ví'}
+              </h3>
+              <button className="modal-close-btn" onClick={() => setBalanceModal(null)}>
+                <X size={18} />
+              </button>
             </div>
 
-            {/* Thêm sản phẩm */}
-            <div className="wallet-card" style={{ gap: 8 }}>
-              <b style={{ fontSize: 13, color: '#fff' }}>Thêm sản phẩm mới:</b>
-              <form onSubmit={handleAddProduct} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <input
-                  type="text"
-                  className="search-input"
-                  style={{ padding: '0 12px', height: 38 }}
-                  placeholder="Tên sản phẩm..."
-                  value={newProdName}
-                  onChange={(e) => setNewProdName(e.target.value)}
-                  required
-                />
+            <div style={{ fontSize: 13, color: '#e2e8f0' }}>
+              Khách hàng: <b>{balanceModal.user?.firstName || 'Khách'}</b> (ID: <code>{balanceModal.user?.telegramId}</code>)
+              <br />
+              Số dư hiện tại: <b>{Number(balanceModal.user?.balance || 0).toLocaleString('vi-VN')} đ</b>
+            </div>
+
+            <form onSubmit={handleAdjustBalance} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div>
+                <span style={{ fontSize: 11, color: 'var(--text-dim)', display: 'block', marginBottom: 4 }}>Số tiền (VND):</span>
                 <input
                   type="number"
                   className="search-input"
-                  style={{ padding: '0 12px', height: 38 }}
-                  placeholder="Giá bán VND..."
-                  value={newProdPrice}
-                  onChange={(e) => setNewProdPrice(e.target.value)}
+                  style={{ padding: '0 12px', height: 42, fontSize: 16, fontWeight: 700 }}
+                  value={balanceModal.amount}
+                  onChange={(e) => setBalanceModal({ ...balanceModal, amount: e.target.value })}
                   required
                 />
-                <select
+              </div>
+
+              <div>
+                <span style={{ fontSize: 11, color: 'var(--text-dim)', display: 'block', marginBottom: 4 }}>Lý do (gửi kèm thông báo Telegram):</span>
+                <input
+                  type="text"
                   className="search-input"
                   style={{ padding: '0 12px', height: 38 }}
-                  value={newProdCatId}
-                  onChange={(e) => setNewProdCatId(e.target.value)}
-                  required
+                  placeholder="VD: Nạp tiền theo yêu cầu, Khuyến mãi..."
+                  value={balanceModal.note}
+                  onChange={(e) => setBalanceModal({ ...balanceModal, note: e.target.value })}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                <button
+                  type="submit"
+                  className={`btn-primary-pill`}
+                  style={{ flex: 1, background: balanceModal.type === 'ADD' ? '#10b981' : '#ef4444' }}
                 >
-                  <option value="">-- Chọn danh mục --</option>
-                  {categories.map((c) => (
-                    <option key={c.id || c.slug} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-                <button type="submit" className="btn-deposit" style={{ alignSelf: 'flex-start' }}>
-                  <Plus size={14} /> Tạo sản phẩm
+                  Xác Nhận {balanceModal.type === 'ADD' ? 'Cộng' : 'Trừ'} Tiền
                 </button>
-              </form>
+                <button
+                  type="button"
+                  className="btn-primary-pill"
+                  style={{ background: 'rgba(255,255,255,0.08)', flex: 1 }}
+                  onClick={() => setBalanceModal(null)}
+                >
+                  Huỷ
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* POPUP SUB-MODAL: NHẬP KEY KHO SẢN PHẨM */}
+      {stockModal && (
+        <div className="modal-overlay" style={{ zIndex: 1100 }} onClick={() => setStockModal(null)}>
+          <div className="modal-sheet" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420 }}>
+            <div className="modal-header">
+              <h3 className="modal-title">📦 Nhập Kho Key Bản Quyền</h3>
+              <button className="modal-close-btn" onClick={() => setStockModal(null)}>
+                <X size={18} />
+              </button>
             </div>
+
+            <div style={{ fontSize: 13, color: '#e2e8f0' }}>
+              Sản phẩm: <b>{stockModal.product?.name}</b>
+            </div>
+
+            <form onSubmit={handleImportStock} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div>
+                <span style={{ fontSize: 11, color: 'var(--text-dim)', display: 'block', marginBottom: 4 }}>
+                  Dán danh sách key / tài khoản (mỗi dòng 1 key):
+                </span>
+                <textarea
+                  className="search-input"
+                  style={{ padding: '10px 12px', minHeight: 120, height: 'auto', resize: 'vertical' }}
+                  placeholder="key-123-abc&#10;user|pass&#10;token-xyz..."
+                  value={stockModal.text}
+                  onChange={(e) => setStockModal({ ...stockModal, text: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="submit" className="btn-primary-pill" style={{ flex: 1 }}>
+                  Xác Nhận Nhập Kho
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary-pill"
+                  style={{ background: 'rgba(255,255,255,0.08)', flex: 1 }}
+                  onClick={() => setStockModal(null)}
+                >
+                  Huỷ
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
