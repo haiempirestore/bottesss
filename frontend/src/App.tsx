@@ -1787,9 +1787,9 @@ export default function App() {
               </button>
             </div>
 
-            {/* Banner liên kết mở Web Admin Riêng */}
+            {/* Banner liên kết mở Web Admin Riêng trên Localhost */}
             <a
-              href="./admin.html"
+              href="http://localhost:4000/admin"
               target="_blank"
               rel="noreferrer"
               style={{
@@ -1810,7 +1810,7 @@ export default function App() {
               }}
             >
               <ExternalLink size={15} color="var(--primary)" />
-              <span>🌐 Mở Trang Web Admin Riêng (Bản Toàn Diện Cho PC & Mobile)</span>
+              <span>🌐 Mở Trang Web Quản Trị Hệ Thống (Localhost: http://localhost:4000/admin)</span>
             </a>
 
             {/* Admin Nav Tabs */}
