@@ -1587,17 +1587,6 @@ if (botToken) {
       return sendVietQR(ctx, amount);
     }
 
-    // Gửi sticker hoạt hình vẫy chào chuyển động 60fps
-    await ctx.sendSticker('CAACAgEAAxUAAWro2cnnMsee-1LZyo8asXjsPDtPAAKlAgACRv7wRzjrsF8nFDx2PQQ').catch(() => {});
-
-    const replyKb = getMainMenuKeyboard();
-    const userCallingName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || ctx.from.first_name || ctx.from.username || 'Quý khách';
-    await ctx.reply(
-      `👋 Xin chào <b>${userCallingName}</b>!\n` +
-      `Chào mừng bạn đến với <b>Shop Hai1110#</b> — Bot tự động giao hàng 24/7!`,
-      { parse_mode: 'HTML', ...replyKb }
-    );
-
     // Gửi ngay Màn hình chính chuẩn 100% ML Oder (Image 3)
     await sendMlOderStart(ctx);
   });
