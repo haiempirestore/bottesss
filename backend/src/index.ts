@@ -949,6 +949,175 @@ app.post('/api/admin/export-githubpage', adminAuth, async (_req, res) => {
   }
 });
 
+// ============================================================
+// SETTINGS VÀ QUẢN TRỊ TELEGRAM BOT TRÊN TRANG WEB ADMIN RIÊNG
+// ============================================================
+const SETTINGS_FILE = path.join(__dirname, '..', 'assets', 'settings.json');
+function loadStoreSettings() {
+  try {
+    if (fs.existsSync(SETTINGS_FILE)) {
+      return JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8'));
+    }
+  } catch {}
+  return {
+    bankId: '970436',
+    accountNo: 'HAI100TR',
+    accountName: 'NGUYEN HOANG HAI',
+    announcement: 'Chào mừng bạn đến với Shop Hai1110# — Hệ thống bán tài khoản & bản quyền tự động 24/7!',
+    maintenanceMode: false,
+    usdtRate: 25400,
+    webAppUrl: 'https://haiempirestore.github.io/bottesss/'
+  };
+}
+
+function saveStoreSettings(data: any) {
+  try {
+    const assetsDir = path.join(__dirname, '..', 'assets');
+    if (!fs.existsSync(assetsDir)) fs.mkdirSync(assetsDir, { recursive: true });
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(data, null, 2), 'utf-8');
+    return true;
+  } catch (e) {
+    console.error('Lỗi lưu settings:', e);
+    return false;
+  }
+}
+
+app.get('/api/settings', (_req, res) => {
+  res.json(loadStoreSettings());
+});
+
+app.get('/api/admin/settings', adminAuth, (_req, res) => {
+  res.json(loadStoreSettings());
+});
+
+app.post('/api/admin/settings', adminAuth, (req, res) => {
+  try {
+    const current = loadStoreSettings();
+    const updated = { ...current, ...req.body };
+    saveStoreSettings(updated);
+    res.json({ ok: true, settings: updated });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Trạng thái Bot Telegram cho Admin Web
+app.get('/api/admin/bot/status', adminAuth, async (_req, res) => {
+  try {
+    const registeredUsers = await prisma.user.count({
+      where: { telegramId: { not: { startsWith: 'web_' } } }
+    });
+    res.json({
+      ok: true,
+      botUsername: 'tainguyenhai1110_bot',
+      botName: 'Shop Hai1110#',
+      adminTelegramId: '6632274262',
+      isPolling: !!bot,
+      registeredUsers,
+      menuButtonUrl: loadStoreSettings().webAppUrl || 'https://haiempirestore.github.io/bottesss/'
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Gửi thông báo hàng loạt (Broadcast) qua Telegram Bot
+app.post('/api/admin/bot/broadcast', adminAuth, async (req, res) => {
+  try {
+    const { message, pinMessage } = z.object({
+      message: z.string().min(1),
+      pinMessage: z.boolean().optional()
+    }).parse(req.body);
+
+    if (!bot) return res.status(500).json({ error: 'Telegram Bot chưa được khởi động' });
+
+    const users = await prisma.user.findMany({
+      where: {
+        telegramId: { not: { startsWith: 'web_' } },
+        isBlocked: false
+      },
+      select: { telegramId: true }
+    });
+
+    let sent = 0;
+    let failed = 0;
+
+    for (const u of users) {
+      try {
+        const text = `📢 <b>THÔNG BÁO TỪ SHOP HAI1110#</b>\n━━━━━━━━━━━━━━━━━━━━\n${message}`;
+        const sentMsg = await bot.telegram.sendMessage(u.telegramId, text, { parse_mode: 'HTML' });
+        if (pinMessage && sentMsg.message_id) {
+          await bot.telegram.pinChatMessage(u.telegramId, sentMsg.message_id).catch(() => {});
+        }
+        sent++;
+      } catch {
+        failed++;
+      }
+    }
+
+    res.json({ ok: true, total: users.length, sent, failed });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Lỗi gửi broadcast' });
+  }
+});
+
+// Gửi tin nhắn riêng đến 1 người dùng Telegram
+app.post('/api/admin/bot/send-message', adminAuth, async (req, res) => {
+  try {
+    const { telegramId, message } = z.object({
+      telegramId: z.string().min(1),
+      message: z.string().min(1)
+    }).parse(req.body);
+
+    if (!bot) return res.status(500).json({ error: 'Telegram Bot chưa được khởi động' });
+
+    await bot.telegram.sendMessage(
+      telegramId,
+      `💬 <b>TIN NHẮN TỪ ADMIN SHOP HAI1110#</b>\n━━━━━━━━━━━━━━━━━━━━\n${message}`,
+      { parse_mode: 'HTML' }
+    );
+
+    res.json({ ok: true, message: 'Đã gửi tin nhắn riêng thành công' });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Lỗi gửi tin nhắn Telegram' });
+  }
+});
+
+// Cập nhật URL Menu Button Telegram
+app.post('/api/admin/bot/set-menu', adminAuth, async (req, res) => {
+  try {
+    const { webAppUrl } = z.object({ webAppUrl: z.string().url() }).parse(req.body);
+    if (!bot) return res.status(500).json({ error: 'Telegram Bot chưa được khởi động' });
+    await (bot.telegram as any).setChatMenuButton({
+      menu_button: {
+        type: 'web_app',
+        text: '🛍️ Mở Cửa Hàng',
+        web_app: { url: webAppUrl }
+      }
+    });
+    const s = loadStoreSettings();
+    s.webAppUrl = webAppUrl;
+    saveStoreSettings(s);
+    res.json({ ok: true, webAppUrl });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Lấy danh sách Key trong kho của 1 sản phẩm
+app.get('/api/admin/products/:id/keys', adminAuth, async (req, res) => {
+  try {
+    const productId = String(req.params.id);
+    const keys = await prisma.stockItem.findMany({
+      where: { productId },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(keys);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // Xử lý đơn hàng trực tiếp qua Bot Telegram (Không cần Tunnel, Không cần VPS)
 async function processOrderDelivery(telegramId: string, username: string | undefined, firstName: string | undefined, productId: string) {
   const product = await prisma.product.findFirst({
@@ -2076,13 +2245,14 @@ if (botToken) {
       `➖ <code>/trutien [telegram_id] [số_tiền]</code>\n` +
       `🚫 <code>/xoatk [telegram_id]</code>\n` +
       `🎁 <code>/themdon [telegram_id] [mã_sp] [nội_dung_key]</code>\n\n` +
-      `<i>Hoặc bấm nút bên dưới để mở Dashboard trên Mini App!</i>`;
+      `<i>Hoặc bấm nút bên dưới để mở Trang Web Admin Quản Trị Hệ Thống!</i>`;
 
     return ctx.reply(text, {
       parse_mode: 'HTML',
       reply_markup: {
         inline_keyboard: [
-          [{ text: '🖥️ Mở Dashboard Quản Trị Trực Quan', web_app: { url: 'https://haiempirestore.github.io/bottesss/' } }]
+          [{ text: '🌐 Mở Trang Web Admin Riêng (Toàn Diện)', url: 'https://haiempirestore.github.io/bottesss/admin.html' }],
+          [{ text: '🖥️ Mở Admin Localhost (Máy tính PC)', url: 'http://localhost:4000/admin.html' }]
         ]
       }
     });
@@ -2765,7 +2935,11 @@ seedDefaultData().catch(console.error);
 
 // Phục vụ giao diện Quản trị trực tiếp trên localhost máy chủ (http://localhost:4000/admin)
 app.use(express.static(frontendDist));
-app.get(['/admin', '/admin/*'], (_req, res, next) => {
+app.get(['/admin', '/admin.html', '/admin/*'], (_req, res, next) => {
+  const adminHtml = path.join(frontendDist, 'admin.html');
+  if (fs.existsSync(adminHtml)) {
+    return res.sendFile(adminHtml);
+  }
   const indexHtml = path.join(frontendDist, 'index.html');
   res.sendFile(indexHtml, (err) => {
     if (err) next();

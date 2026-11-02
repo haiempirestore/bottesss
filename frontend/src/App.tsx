@@ -1787,6 +1787,32 @@ export default function App() {
               </button>
             </div>
 
+            {/* Banner liên kết mở Web Admin Riêng */}
+            <a
+              href="./admin.html"
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                padding: '11px 14px',
+                borderRadius: 12,
+                background: 'linear-gradient(135deg, rgba(255, 36, 83, 0.22) 0%, rgba(255, 36, 83, 0.08) 100%)',
+                border: '1px solid rgba(255, 36, 83, 0.4)',
+                color: '#fff',
+                textDecoration: 'none',
+                fontWeight: 700,
+                fontSize: 12.5,
+                margin: '8px 16px 12px 16px',
+                boxShadow: '0 4px 14px rgba(255, 36, 83, 0.2)'
+              }}
+            >
+              <ExternalLink size={15} color="var(--primary)" />
+              <span>🌐 Mở Trang Web Admin Riêng (Bản Toàn Diện Cho PC & Mobile)</span>
+            </a>
+
             {/* Admin Nav Tabs */}
             <div className="admin-nav-tabs">
               <button
