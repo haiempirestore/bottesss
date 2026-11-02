@@ -9,6 +9,12 @@ import { Telegraf, Markup } from 'telegraf';
 import { prisma } from './db.js';
 import { verifyTelegramInitData, signUser, userAuth, adminAuth, signAdmin } from './security.js';
 import crypto from 'node:crypto';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const frontendDist = path.resolve(__dirname, '../../frontend/dist');
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
@@ -118,7 +124,37 @@ app.get('/api/auth/guest', async (_req, res) => {
   });
 });
 
-// Quản trị viên: Tự động cấp quyền Admin không cần mật khẩu/tài khoản
+// Middleware chặn mọi truy cập Quản trị từ bên ngoài (chỉ cho phép localhost trên máy chủ)
+function requireLocalhost(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const host = (req.headers['x-forwarded-host'] || req.headers.host || '').toString().toLowerCase();
+  const origin = (req.headers.origin || '').toString().toLowerCase();
+  const remoteIp = req.socket.remoteAddress || '';
+
+  // Chặn nếu request có origin từ GitHub Pages hoặc domain ngoài
+  if (origin && !origin.includes('localhost') && !origin.includes('127.0.0.1')) {
+    return res.status(403).json({ error: 'Truy cập bị từ chối: Trang quản trị chỉ được phép mở trực tiếp trên localhost máy chủ.' });
+  }
+
+  // Chặn nếu request đi qua tunnel công khai (Cloudflare, localtunnel, ngrok...)
+  if (host.includes('trycloudflare.com') || host.includes('loca.lt') || host.includes('ngrok') || host.includes('github.io')) {
+    return res.status(403).json({ error: 'Truy cập bị từ chối: Trang quản trị chỉ được phép mở trực tiếp trên localhost máy chủ.' });
+  }
+
+  // Kiểm tra kết nối từ localhost
+  const isLocalIp = remoteIp === '127.0.0.1' || remoteIp === '::1' || remoteIp === '::ffff:127.0.0.1';
+  const isLocalHost = host.startsWith('localhost') || host.startsWith('127.0.0.1');
+
+  if (!isLocalHost || !isLocalIp) {
+    return res.status(403).json({ error: 'Truy cập bị từ chối: Trang quản trị chỉ được phép mở trực tiếp trên localhost máy chủ.' });
+  }
+
+  next();
+}
+
+// Áp dụng bảo vệ nghiêm ngặt cho toàn bộ API Admin
+app.use('/api/admin', requireLocalhost);
+
+// Quản trị viên: Tự động cấp quyền Admin không cần mật khẩu/tài khoản (chỉ hoạt động khi gọi từ localhost)
 app.all(['/api/admin/login', '/api/admin/session'], async (_req, res) => {
   let admin = await prisma.admin.findFirst();
   if (!admin) {
@@ -337,6 +373,15 @@ async function seedDefaultData() {
   }
 }
 seedDefaultData().catch(console.error);
+
+// Phục vụ giao diện Quản trị trực tiếp trên localhost máy chủ (http://localhost:4000/admin)
+app.use(express.static(frontendDist));
+app.get(['/admin', '/admin/*'], (_req, res, next) => {
+  const indexHtml = path.join(frontendDist, 'index.html');
+  res.sendFile(indexHtml, (err) => {
+    if (err) next();
+  });
+});
 
 app.listen(port, () => console.log(`API listening on ${port}`));
 process.once('SIGINT', () => bot?.stop('SIGINT'));

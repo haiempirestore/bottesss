@@ -22,11 +22,17 @@ if (queryApi && typeof window !== 'undefined') {
 }
 const initialApi = ((typeof window !== 'undefined' && localStorage.getItem('apiUrl')) || (import.meta as any).env.VITE_API_URL || 'http://localhost:4000').replace(/\/+$/, '');
 
+const isLocalhost = typeof window !== 'undefined' && (
+  window.location.hostname === 'localhost' ||
+  window.location.hostname === '127.0.0.1'
+);
+
 type Product = { id: string; name: string; description?: string; price: number; salePrice?: number; category?: { name: string } };
 
 export default function App() {
+  // Trang quản trị CHỈ được phép mở khi đang chạy trên localhost của máy chủ
   const [adminMode, setAdminMode] = useState(
-    typeof window !== 'undefined' && (location.pathname.startsWith('/admin') || location.hash === '#admin')
+    isLocalhost && (location.pathname.startsWith('/admin') || location.hash === '#admin')
   );
   const [apiUrl, setApiUrl] = useState(initialApi);
   const [showConfig, setShowConfig] = useState(false);
@@ -190,33 +196,37 @@ export default function App() {
   return (
     <main className="shell">
       <header>
-        <div className="brand" onClick={() => { setAdminMode(false); }}>
+        <div className="brand" onClick={() => { if (isLocalhost) setAdminMode(false); }}>
           SHOP<span>HAI1110</span>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <button
-            className="ghost"
-            style={{ padding: '6px 12px', fontSize: '11px', borderRadius: '8px' }}
-            onClick={() => {
-              const next = !adminMode;
-              setAdminMode(next);
-              setToken('');
-              if (typeof window !== 'undefined') {
-                window.location.hash = next ? 'admin' : '';
-              }
-            }}
-          >
-            {adminMode ? '🛍️ VỀ CỬA HÀNG' : '⚡ QUẢN TRỊ'}
-          </button>
-          <button
-            className="ghost"
-            style={{ padding: '6px 8px', borderRadius: '8px' }}
-            title="Cài đặt API Backend"
-            onClick={() => setShowConfig(!showConfig)}
-          >
-            <Settings size={14} />
-          </button>
-          <div className="status"><i /> {apiUrl.includes('localhost') ? 'LOCAL' : 'TUNNEL'}</div>
+          {isLocalhost && (
+            <>
+              <button
+                className="ghost"
+                style={{ padding: '6px 12px', fontSize: '11px', borderRadius: '8px' }}
+                onClick={() => {
+                  const next = !adminMode;
+                  setAdminMode(next);
+                  setToken('');
+                  if (typeof window !== 'undefined') {
+                    window.location.hash = next ? 'admin' : '';
+                  }
+                }}
+              >
+                {adminMode ? '🛍️ VỀ CỬA HÀNG' : '⚡ QUẢN TRỊ (LOCAL)'}
+              </button>
+              <button
+                className="ghost"
+                style={{ padding: '6px 8px', borderRadius: '8px' }}
+                title="Cài đặt API Backend"
+                onClick={() => setShowConfig(!showConfig)}
+              >
+                <Settings size={14} />
+              </button>
+            </>
+          )}
+          <div className="status"><i /> {isLocalhost ? 'LOCAL SERVER' : 'SYSTEM ONLINE'}</div>
         </div>
       </header>
 
