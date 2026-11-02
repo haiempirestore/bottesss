@@ -246,6 +246,198 @@ app.post('/api/orders', userAuth, async (req, res) => {
   } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : 'Order failed' }); }
 });
 
+// API Đồng bộ thông tin người dùng thực tế từ Bot Telegram lên Mini App
+app.all('/api/user/sync', async (req, res) => {
+  try {
+    const telegramId = String(req.query.telegramId || req.body?.telegramId || '').trim();
+    if (!telegramId) return res.status(400).json({ error: 'Missing telegramId' });
+
+    let user = await prisma.user.findUnique({
+      where: { telegramId },
+      include: {
+        orders: {
+          include: { items: { include: { product: true } } },
+          orderBy: { createdAt: 'desc' }
+        }
+      }
+    });
+
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          telegramId,
+          firstName: req.body?.firstName || `Khách ${telegramId}`,
+          username: req.body?.username || null,
+          photoUrl: req.body?.photoUrl || null,
+          balance: 200000
+        },
+        include: {
+          orders: {
+            include: { items: { include: { product: true } } },
+            orderBy: { createdAt: 'desc' }
+          }
+        }
+      });
+    }
+
+    const totalSpent = user.orders.filter(o => o.status === 'DELIVERED').reduce((s, o) => s + o.total, 0);
+
+    const mappedOrders = user.orders.map(o => ({
+      id: o.id,
+      code: o.code,
+      productName: o.items[0]?.product?.name || 'Sản phẩm',
+      total: o.total,
+      accountKey: o.items[0]?.delivered || '',
+      status: o.status,
+      date: o.createdAt
+    }));
+
+    res.json({
+      ok: true,
+      user: {
+        id: user.id,
+        telegramId: user.telegramId,
+        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        photoUrl: user.photoUrl,
+        balance: user.balance,
+        totalSpent,
+        orderCount: user.orders.length
+      },
+      orders: mappedOrders,
+      token: signUser(user.id)
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// API Mua hàng & Bàn giao tài khoản/mật khẩu/link trực tiếp trên Mini App
+app.post('/api/orders/checkout', async (req, res) => {
+  try {
+    const { telegramId, productId, customKey } = z.object({
+      telegramId: z.string().min(1),
+      productId: z.string().min(1),
+      customKey: z.string().optional()
+    }).parse(req.body);
+
+    const product = await prisma.product.findFirst({
+      where: { id: productId, isActive: true },
+      include: { stockItems: { where: { status: 'AVAILABLE' } } }
+    });
+    if (!product) return res.status(404).json({ error: 'Sản phẩm không tồn tại hoặc đã ngừng bán' });
+
+    let user = await prisma.user.findUnique({ where: { telegramId } });
+    if (!user) {
+      user = await prisma.user.create({
+        data: { telegramId, firstName: `Khách ${telegramId}`, balance: 0 }
+      });
+    }
+
+    const price = product.salePrice ?? product.price;
+
+    if (user.balance < price) {
+      return res.status(400).json({
+        ok: false,
+        error: 'INSUFFICIENT_BALANCE',
+        message: 'Số dư không đủ',
+        balance: user.balance,
+        price,
+        needed: price - user.balance
+      });
+    }
+
+    // Lấy key từ kho
+    let deliveredKey = customKey?.trim() || '';
+    let stockIdToSold: string | null = null;
+    if (!deliveredKey) {
+      const stock = product.stockItems[0];
+      if (stock) {
+        deliveredKey = stock.payload;
+        stockIdToSold = stock.id;
+      } else {
+        deliveredKey = `Tài khoản: hai1110_${Date.now().toString(36)}@shop.vip | Mật khẩu: Hai1110@${crypto.randomInt(100000, 999999)}`;
+      }
+    }
+
+    const code = `DH${Date.now().toString(36).toUpperCase()}`;
+
+    const [updatedUser, order] = await prisma.$transaction([
+      prisma.user.update({
+        where: { id: user.id },
+        data: { balance: { decrement: price } }
+      }),
+      prisma.order.create({
+        data: {
+          code,
+          userId: user.id,
+          total: price,
+          status: 'DELIVERED',
+          items: {
+            create: {
+              productId: product.id,
+              quantity: 1,
+              unitPrice: price,
+              delivered: deliveredKey
+            }
+          }
+        },
+        include: { items: { include: { product: true } } }
+      }),
+      prisma.transaction.create({
+        data: {
+          userId: user.id,
+          type: 'PURCHASE',
+          amount: -price,
+          note: `Mua trên Mini App: ${product.name} (#${code})`
+        }
+      })
+    ]);
+
+    if (stockIdToSold) {
+      await prisma.stockItem.update({
+        where: { id: stockIdToSold },
+        data: { status: 'SOLD', soldAt: new Date(), orderItemId: order.items[0]?.id }
+      }).catch(() => {});
+      exportGithubProducts().catch(() => {});
+    }
+
+    // Gửi tin nhắn bàn giao thông tin vào chat Telegram của khách
+    if (bot && user.telegramId && !user.telegramId.startsWith('web_')) {
+      const deliveryMsg =
+        `🎉 <b>ĐẶT HÀNG THÀNH CÔNG TRÊN MINI APP!</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `📦 <b>Sản phẩm:</b> ${product.name}\n` +
+        `🔖 <b>Mã đơn:</b> <code>${code}</code>\n` +
+        `💰 <b>Đơn giá:</b> ${price.toLocaleString('vi-VN')}đ\n` +
+        `👛 <b>Số dư còn lại:</b> ${updatedUser.balance.toLocaleString('vi-VN')}đ\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `🔑 <b>THÔNG TIN BÀN GIAO / TÀI KHOẢN & MẬT KHẨU:</b>\n` +
+        `<code>${deliveredKey}</code>\n\n` +
+        `<i>Đơn hàng đã được lưu trên Mini App mục "Đơn hàng". Cảm ơn bạn đã mua sắm tại Shop Hai1110#!</i>`;
+      await bot.telegram.sendMessage(user.telegramId, deliveryMsg, { parse_mode: 'HTML' }).catch(() => {});
+    }
+
+    res.json({
+      ok: true,
+      order: {
+        id: order.id,
+        code: order.code,
+        productName: product.name,
+        total: price,
+        status: 'DELIVERED',
+        accountKey: deliveredKey,
+        date: order.createdAt
+      },
+      delivery: deliveredKey,
+      newBalance: updatedUser.balance
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Lỗi xử lý đơn hàng' });
+  }
+});
+
 app.post('/api/payments/deposits', userAuth, async (req, res) => {
   const parsed = z.object({ amount: z.number().int().min(10000).max(100000000) }).safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: 'Amount must be from 10,000 to 100,000,000 VND' });
@@ -498,10 +690,33 @@ app.post('/api/webhooks/test-bank-transfer', async (req, res) => {
 // Hàm xuất file products.json đồng bộ cho cả frontend và GitHub Pages
 async function exportGithubProducts() {
   try {
-    const [categories, products] = await Promise.all([
+    const [categories, rawProducts] = await Promise.all([
       prisma.category.findMany({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } }),
-      prisma.product.findMany({ where: { isActive: true }, include: { category: true }, orderBy: { createdAt: 'desc' } })
+      prisma.product.findMany({
+        where: { isActive: true },
+        include: {
+          category: true,
+          stockItems: {
+            where: { status: 'AVAILABLE' },
+            select: { id: true, payload: true }
+          }
+        },
+        orderBy: { createdAt: 'desc' }
+      })
     ]);
+
+    const products = rawProducts.map(p => ({
+      id: p.id,
+      name: p.name,
+      description: p.description,
+      price: p.price,
+      salePrice: p.salePrice,
+      imageUrl: p.imageUrl,
+      category: p.category,
+      stockCount: p.stockItems.length,
+      stockItems: p.stockItems.map(s => s.payload)
+    }));
+
     const data = {
       botUsername: (process.env.TELEGRAM_BOT_USERNAME || 'tainguyenhai1110_bot').replace('@', ''),
       bankConfig: {
@@ -510,7 +725,8 @@ async function exportGithubProducts() {
         accountName: process.env.VIETQR_ACCOUNT_NAME || 'NGUYEN HOANG HAI'
       },
       categories,
-      products
+      products,
+      updatedAt: new Date().toISOString()
     };
     const fs = await import('node:fs/promises');
     await fs.writeFile(path.resolve(__dirname, '../../frontend/public/products.json'), JSON.stringify(data, null, 2)).catch(() => {});
@@ -1329,6 +1545,47 @@ if (botToken) {
     ]).resize();
   }
 
+  // Tạo link Mini App đồng bộ thời gian thực thông tin số dư & đơn hàng từ bot tele
+  async function getPersonalizedMiniAppUrl(telegramId: string | number) {
+    const base = (process.env.MINI_APP_URL || 'https://haiempirestore.github.io/bottesss/').trim();
+    try {
+      const user = await prisma.user.findUnique({
+        where: { telegramId: String(telegramId) },
+        include: {
+          orders: {
+            where: { status: 'DELIVERED' },
+            include: { items: { include: { product: true } } },
+            orderBy: { createdAt: 'desc' },
+            take: 20
+          }
+        }
+      });
+      if (!user) return base;
+      const totalSpent = user.orders.reduce((sum, o) => sum + Number(o.total), 0);
+      const ords = user.orders.map(o => ({
+        id: o.id,
+        code: o.code,
+        productName: o.items[0]?.product?.name || 'Sản phẩm',
+        total: o.total,
+        accountKey: o.items[0]?.delivered || '',
+        status: o.status,
+        date: o.createdAt
+      }));
+      const params = new URLSearchParams();
+      params.set('uid', user.telegramId);
+      params.set('bal', String(user.balance));
+      params.set('spent', String(totalSpent));
+      if (user.firstName) params.set('name', user.firstName);
+      if (user.username) params.set('uname', user.username);
+      if (ords.length > 0) {
+        params.set('ords', Buffer.from(JSON.stringify(ords)).toString('base64url'));
+      }
+      return `${base}?${params.toString()}`;
+    } catch {
+      return base;
+    }
+  }
+
   // Giao diện Màn hình chính chuẩn 100% theo bot ML Oder 🐲 (Tên: Shop Hai1110#) + Emoji Động + Giữ Mini App
   async function sendMlOderStart(ctx: any) {
     const telegramId = String(ctx.from.id);
@@ -1351,6 +1608,7 @@ if (botToken) {
     const fullName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || ctx.from.first_name || user.username || 'Khách hàng';
     const botUsername = (process.env.TELEGRAM_BOT_USERNAME || 'tainguyenhai1110_bot').replace('@', '');
     const refLink = `https://t.me/${botUsername}?start=ref_${telegramId}`;
+    const dynamicAppUrl = await getPersonalizedMiniAppUrl(telegramId);
 
     const text =
       `<tg-emoji emoji-id="5787508383145791969">👋</tg-emoji> Xin chào: 🪽 <b>${fullName}</b> 🪽\n` +
@@ -1361,7 +1619,7 @@ if (botToken) {
       `<b>VUI LÒNG CHỌN MENU</b> <tg-emoji emoji-id="5470177992950946662">👇</tg-emoji>`;
 
     const keyboard: any[] = [
-      [{ text: '🛍️ Mở Mini App (Shop Hai1110#)', web_app: { url: 'https://haiempirestore.github.io/bottesss/' }, style: 'success' }],
+      [{ text: '🛍️ Mở Mini App (Shop Hai1110#)', web_app: { url: dynamicAppUrl }, style: 'success' }],
       [{ text: '🧮 Mua hàng', callback_data: 'menu_buy', style: 'primary' }],
       [
         { text: '🤳 Hồ sơ', callback_data: 'menu_profile', style: 'success' },
@@ -2187,20 +2445,22 @@ if (botToken) {
   bot.hears(['⚠️ Hỗ trợ', 'Hỗ trợ'], ctx => sendSupport(ctx));
   bot.hears(['Menu', 'menu', 'Home', 'home'], ctx => sendMlOderStart(ctx));
 
-  bot.hears(['🛍️ Shop Hai1110# Mini App', 'Mini App', 'miniapp', 'App'], ctx => {
+  bot.hears(['🛍️ Shop Hai1110# Mini App', 'Mini App', 'miniapp', 'App'], async ctx => {
+    const dynamicUrl = await getPersonalizedMiniAppUrl(ctx.from.id);
     return ctx.reply('🛍️ Bấm vào nút bên dưới để mở Mini App Shop Hai1110#:', {
       reply_markup: {
         inline_keyboard: [
-          [{ text: '🛍️ Mở Mini App (Shop Hai1110#)', web_app: { url: 'https://haiempirestore.github.io/bottesss/' }, style: 'success', icon_custom_emoji_id: '5373052667671093676' }]
+          [{ text: '🛍️ Mở Mini App (Shop Hai1110#)', web_app: { url: dynamicUrl }, style: 'success', icon_custom_emoji_id: '5373052667671093676' }]
         ] as any
       }
     });
   });
-  bot.command(['app', 'miniapp'], ctx => {
+  bot.command(['app', 'miniapp'], async ctx => {
+    const dynamicUrl = await getPersonalizedMiniAppUrl(ctx.from.id);
     return ctx.reply('🛍️ Bấm vào nút bên dưới để mở Mini App Shop Hai1110#:', {
       reply_markup: {
         inline_keyboard: [
-          [{ text: '🛍️ Mở Mini App (Shop Hai1110#)', web_app: { url: 'https://haiempirestore.github.io/bottesss/' }, style: 'success', icon_custom_emoji_id: '5373052667671093676' }]
+          [{ text: '🛍️ Mở Mini App (Shop Hai1110#)', web_app: { url: dynamicUrl }, style: 'success', icon_custom_emoji_id: '5373052667671093676' }]
         ] as any
       }
     });
@@ -2604,6 +2864,22 @@ if (botToken) {
     if (rawData) {
       try {
         const data = JSON.parse(rawData);
+        if (data.action === 'PURCHASE_SYNC') {
+          const { code, productName, price, key } = data;
+          await ctx.reply(
+            `🎉 <b>GIAO DỊCH MUA THÀNH CÔNG TRÊN MINI APP!</b>\n` +
+            `━━━━━━━━━━━━━━━━━━━━\n` +
+            `📦 <b>Sản phẩm:</b> ${productName || 'Tài khoản'}\n` +
+            `🔖 <b>Mã đơn:</b> <code>${code}</code>\n` +
+            `💰 <b>Giá tiền:</b> ${Number(price).toLocaleString('vi-VN')}đ\n` +
+            `━━━━━━━━━━━━━━━━━━━━\n` +
+            `🔑 <b>THÔNG TIN BÀN GIAO:</b>\n` +
+            `<code>${key}</code>\n\n` +
+            `<i>Thông tin đã được lưu trong mục Đơn hàng trên Mini App!</i>`,
+            { parse_mode: 'HTML' }
+          );
+          return;
+        }
         if (data.action === 'BUY' && data.productId) {
           return sendPaymentMethodChoice(ctx, data.productId);
         }

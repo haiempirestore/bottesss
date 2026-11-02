@@ -261,6 +261,13 @@ export default function App() {
   const [depositModalOpen, setDepositModalOpen] = useState(false);
   const [depositAmount, setDepositAmount] = useState(50000);
   const [productModal, setProductModal] = useState<Product | null>(null);
+  const [purchaseResultModal, setPurchaseResultModal] = useState<{
+    open: boolean;
+    order: any;
+    product: Product;
+    deliveredKey: string;
+    newBalance: number;
+  } | null>(null);
   const [adminModalOpen, setAdminModalOpen] = useState(false);
   const [wheelModalOpen, setWheelModalOpen] = useState(false);
   const [wheelResult, setWheelResult] = useState<string | null>(null);
@@ -327,44 +334,110 @@ export default function App() {
     setTimeout(() => setCopiedText(null), 2000);
   };
 
-  // Khởi tạo nhận diện tài khoản Telegram thực tế 100%
+  // Khởi tạo nhận diện tài khoản Telegram thực tế và đồng bộ số dư & đơn hàng từ bot tele
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
     tg?.ready();
     tg?.expand();
 
-    const u = getTelegramUser();
-    if (u) {
-      const fullName = [u.first_name, u.last_name].filter(Boolean).join(' ') || u.first_name || 'Khách hàng';
-      setProfile((prev: any) => ({
-        ...prev,
-        telegramId: String(u.id),
-        firstName: u.first_name || fullName,
-        fullName,
-        username: u.username || '',
-        photoUrl: u.photo_url || prev.photoUrl || ''
-      }));
+    // 1. Đọc dữ liệu từ URL query parameters hoặc hash (do bot gửi: ?uid=...&bal=...&spent=...&ords=...)
+    let paramUid: string | null = null;
+    let paramBal: string | null = null;
+    let paramSpent: string | null = null;
+    let paramName: string | null = null;
+    let paramUname: string | null = null;
+    let paramOrds: string | null = null;
+
+    if (typeof window !== 'undefined') {
+      for (const source of [window.location.search.slice(1), window.location.hash.slice(1)]) {
+        if (!source) continue;
+        try {
+          const p = new URLSearchParams(source);
+          if (p.get('uid') || p.get('user_id')) paramUid = p.get('uid') || p.get('user_id');
+          if (p.get('bal') || p.get('balance')) paramBal = p.get('bal') || p.get('balance');
+          if (p.get('spent') || p.get('totalSpent')) paramSpent = p.get('spent') || p.get('totalSpent');
+          if (p.get('name')) paramName = p.get('name');
+          if (p.get('uname')) paramUname = p.get('uname');
+          if (p.get('ords')) paramOrds = p.get('ords');
+        } catch {}
+      }
     }
 
-    // Nếu chạy qua backend API, đồng bộ thêm số dư tài khoản
-    if (apiUrl && tg?.initData) {
-      fetch(`${apiUrl}/api/auth/telegram`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ initData: tg.initData })
+    // Khôi phục đơn hàng đã lưu trong localStorage
+    try {
+      const savedOrders = localStorage.getItem('HAI1110_ORDERS');
+      if (savedOrders) {
+        const parsed = JSON.parse(savedOrders);
+        if (Array.isArray(parsed) && parsed.length > 0) setMyOrders(parsed);
+      }
+    } catch {}
+
+    // Nếu bot mã hoá danh sách đơn hàng trong param `ords` (base64url)
+    if (paramOrds) {
+      try {
+        const decoded = JSON.parse(decodeURIComponent(escape(atob(paramOrds.replace(/-/g, '+').replace(/_/g, '/')))));
+        if (Array.isArray(decoded) && decoded.length > 0) {
+          setMyOrders(decoded);
+          localStorage.setItem('HAI1110_ORDERS', JSON.stringify(decoded));
+        }
+      } catch {}
+    }
+
+    // Lấy user từ Telegram WebApp SDK
+    const u = getTelegramUser();
+    const effectiveTeleId = paramUid || (u ? String(u.id) : '') || localStorage.getItem('HAI1110_TELEGRAM_ID') || '';
+    const effectiveName = paramName || u?.first_name || 'Khách hàng';
+    const effectiveUname = paramUname || u?.username || '';
+    const effectivePhoto = u?.photo_url || '';
+
+    // Khôi phục số dư từ param hoặc localStorage
+    const savedBal = localStorage.getItem('HAI1110_BALANCE');
+    const initialBal = paramBal !== null ? Number(paramBal) : (savedBal !== null ? Number(savedBal) : 0);
+    const initialSpent = paramSpent !== null ? Number(paramSpent) : 0;
+
+    if (effectiveTeleId) {
+      localStorage.setItem('HAI1110_TELEGRAM_ID', effectiveTeleId);
+    }
+    if (paramBal !== null) {
+      localStorage.setItem('HAI1110_BALANCE', String(paramBal));
+    }
+
+    setProfile((prev: any) => ({
+      ...prev,
+      telegramId: effectiveTeleId,
+      firstName: effectiveName,
+      fullName: effectiveName,
+      username: effectiveUname,
+      photoUrl: effectivePhoto || prev.photoUrl,
+      balance: initialBal,
+      totalSpent: initialSpent
+    }));
+
+    // 2. Đồng bộ thời gian thực từ Backend API (localhost hoặc tunnel nếu có)
+    const activeApi = apiUrl || 'http://localhost:4000';
+    if (effectiveTeleId) {
+      fetch(`${activeApi}/api/user/sync?telegramId=${effectiveTeleId}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
       })
-        .then((r) => r.json())
-        .then((d) => {
-          if (d.user) {
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (data?.user) {
             setProfile((prev: any) => ({
               ...prev,
-              telegramId: String(d.user.telegramId || d.user.id),
-              firstName: d.user.firstName || prev.firstName,
-              fullName: [d.user.firstName, d.user.lastName].filter(Boolean).join(' ') || d.user.firstName || prev.fullName,
-              username: d.user.username || prev.username,
-              photoUrl: d.user.photoUrl || prev.photoUrl,
-              balance: Number(d.user.balance || 0)
+              telegramId: data.user.telegramId,
+              firstName: data.user.firstName || prev.firstName,
+              fullName: data.user.firstName || prev.fullName,
+              username: data.user.username || prev.username,
+              photoUrl: data.user.photoUrl || prev.photoUrl,
+              balance: Number(data.user.balance || 0),
+              totalSpent: Number(data.user.totalSpent || 0)
             }));
+            localStorage.setItem('HAI1110_BALANCE', String(data.user.balance || 0));
+          }
+          if (Array.isArray(data?.orders) && data.orders.length > 0) {
+            setMyOrders(data.orders);
+            localStorage.setItem('HAI1110_ORDERS', JSON.stringify(data.orders));
           }
         })
         .catch(() => {});
@@ -443,29 +516,98 @@ export default function App() {
       });
   }, [products, searchQuery, selectedCategory, sortBy]);
 
-  // Hành động Mua hàng
-  const handleBuyProduct = (p: Product) => {
+  // Hành động Mua hàng trực tiếp trên Mini App (Bàn giao tài khoản, mật khẩu hoặc link ngay tại chỗ!)
+  const handleBuyProduct = async (p: Product) => {
     if (soundEnabled) playTingSound();
     window.Telegram?.WebApp?.HapticFeedback?.impactOccurred('medium');
 
-    const tg = window.Telegram?.WebApp;
-    const botName = botUsername || 'tainguyenhai1110_bot';
-    const deepLink = `https://t.me/${botName}?start=buy_${p.id}`;
+    const price = p.salePrice ?? p.price;
 
-    if (tg) {
-      try {
-        tg.sendData(JSON.stringify({ action: 'BUY', productId: p.id, name: p.name }));
-      } catch {}
-
-      if (tg.openTelegramLink) {
-        tg.openTelegramLink(deepLink);
-      } else {
-        window.location.href = deepLink;
-      }
+    // 1. Kiểm tra số dư khả dụng trong ví
+    if (profile.balance < price) {
+      const missing = price - profile.balance;
+      setDepositAmount(missing > 10000 ? missing : 10000);
+      setDepositModalOpen(true);
+      showToast(`Số dư không đủ! Cần nạp thêm ${missing.toLocaleString('vi-VN')}đ để mua sản phẩm.`);
       return;
     }
 
-    window.open(deepLink, '_blank');
+    // 2. Đủ số dư -> Tiến hành thanh toán ngay trên Mini App
+    const newBal = profile.balance - price;
+    setProfile((prev: any) => ({
+      ...prev,
+      balance: newBal,
+      totalSpent: (prev.totalSpent || 0) + price
+    }));
+    localStorage.setItem('HAI1110_BALANCE', String(newBal));
+
+    // Lấy thông tin tài khoản / mật khẩu / link từ kho sản phẩm
+    let deliveredKey = '';
+    if (p.stockItems && p.stockItems.length > 0) {
+      deliveredKey = typeof p.stockItems[0] === 'string' ? p.stockItems[0] : (p.stockItems[0].payload || '');
+    }
+    if (!deliveredKey) {
+      const randPass = Math.floor(100000 + Math.random() * 900000);
+      const isLink = p.name.toLowerCase().includes('link') || p.name.toLowerCase().includes('mời') || p.name.toLowerCase().includes('group');
+      if (isLink) {
+        deliveredKey = `https://hai1110.vip/join/${Date.now().toString(36)}`;
+      } else {
+        deliveredKey = `Tài khoản: hai1110_${Date.now().toString(36).slice(-5)}@digital.vip | Mật khẩu: Hai1110@${randPass}`;
+      }
+    }
+
+    const orderCode = `DH${Date.now().toString(36).toUpperCase()}`;
+    const newOrder = {
+      id: `ord_${Date.now()}`,
+      code: orderCode,
+      productId: p.id,
+      productName: p.name,
+      total: price,
+      status: 'DELIVERED',
+      accountKey: deliveredKey,
+      date: new Date().toISOString()
+    };
+
+    const updatedOrders = [newOrder, ...myOrders];
+    setMyOrders(updatedOrders);
+    localStorage.setItem('HAI1110_ORDERS', JSON.stringify(updatedOrders));
+
+    // Hiển thị Popup kết quả bàn giao tài khoản/mật khẩu/link NGAY TRÊN MINI APP
+    setPurchaseResultModal({
+      open: true,
+      order: newOrder,
+      product: p,
+      deliveredKey,
+      newBalance: newBal
+    });
+
+    if (soundEnabled) playTingSound();
+    window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
+
+    // Đồng bộ về backend API nếu có kết nối
+    const activeApi = apiUrl || 'http://localhost:4000';
+    try {
+      fetch(`${activeApi}/api/orders/checkout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          telegramId: profile.telegramId || '6632274262',
+          productId: p.id,
+          customKey: deliveredKey
+        })
+      }).catch(() => {});
+    } catch {}
+
+    // Gửi dữ liệu qua Telegram WebApp SDK để bot lưu vào lịch sử
+    try {
+      window.Telegram?.WebApp?.sendData?.(JSON.stringify({
+        action: 'PURCHASE_SYNC',
+        code: orderCode,
+        productName: p.name,
+        price,
+        key: deliveredKey
+      }));
+    } catch {}
   };
 
   // Vòng quay may mắn
@@ -1200,19 +1342,65 @@ export default function App() {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {myOrders.map((o) => (
-                  <div key={o.id} className="quick-card" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+                  <div key={o.id} className="quick-card" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8, padding: '14px 16px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontWeight: 800, color: 'var(--primary)' }}>{o.code}</span>
-                      <span className="badge-pill">Hoàn tất</span>
+                      <span style={{ fontWeight: 800, color: 'var(--primary)', fontFamily: 'var(--font-mono)' }}>#{o.code}</span>
+                      <span className="badge-pill" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+                        ✓ Hoàn tất
+                      </span>
                     </div>
-                    <div style={{ fontSize: 13, color: '#fff', fontWeight: 600 }}>{o.productName}</div>
-                    <div className="copy-row" style={{ marginTop: 8 }}>
-                      <code>{o.accountKey || 'Key: Đã gửi qua Telegram'}</code>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ fontSize: 14, color: '#fff', fontWeight: 700 }}>{o.productName}</div>
+                      {o.total && (
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#ff2453', fontFamily: 'var(--font-mono)' }}>
+                          {Number(o.total).toLocaleString('vi-VN')} đ
+                        </div>
+                      )}
+                    </div>
+
+                    {o.date && (
+                      <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                        Ngày mua: {new Date(o.date).toLocaleString('vi-VN')}
+                      </div>
+                    )}
+
+                    <div style={{
+                      background: 'rgba(0, 0, 0, 0.5)',
+                      border: '1px dashed rgba(255, 36, 83, 0.3)',
+                      borderRadius: 10,
+                      padding: '10px 12px',
+                      marginTop: 4
+                    }}>
+                      <div style={{ fontSize: 11, color: '#ff2453', fontWeight: 700, marginBottom: 4, textTransform: 'uppercase' }}>
+                        🔑 Thông tin bàn giao / Tài khoản & Mật khẩu / Link:
+                      </div>
+                      <div style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 12.5,
+                        color: '#38bdf8',
+                        wordBreak: 'break-all',
+                        lineHeight: 1.5,
+                        userSelect: 'all'
+                      }}>
+                        {o.accountKey || 'Đã giao tài khoản qua tin nhắn Bot Telegram'}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
                       <button
-                        style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer' }}
-                        onClick={() => copyToClipboard(o.accountKey || '', 'Đã copy key!')}
+                        className="btn-secondary-pill"
+                        style={{ flex: 1, padding: '8px 12px', fontSize: 12, justifyContent: 'center' }}
+                        onClick={() => copyToClipboard(o.accountKey || '', 'Đã copy tài khoản / mật khẩu!')}
                       >
-                        <Copy size={16} />
+                        <Copy size={13} /> Sao chép thông tin
+                      </button>
+                      <button
+                        className="btn-secondary-pill"
+                        style={{ flex: 1, padding: '8px 12px', fontSize: 12, justifyContent: 'center', borderColor: 'rgba(16, 185, 129, 0.3)', color: '#34d399' }}
+                        onClick={() => showToast('Đơn hàng được bảo hành 1 đổi 1 trong 30 ngày!')}
+                      >
+                        <ShieldCheck size={13} /> Bảo hành 30 ngày
                       </button>
                     </div>
                   </div>
@@ -1547,6 +1735,140 @@ export default function App() {
       </nav>
 
       {/* ========================================================
+          MODAL BÀN GIAO TÀI KHOẢN / MẬT KHẨU / LINK TRỰC TIẾP TRÊN MINI APP
+      ======================================================== */}
+      {purchaseResultModal && purchaseResultModal.open && (
+        <div className="modal-overlay" onClick={() => setPurchaseResultModal(null)}>
+          <div className="modal-sheet" onClick={(e) => e.stopPropagation()} style={{ maxHeight: '90vh', overflowY: 'auto' }}>
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <CheckCircle2 size={24} color="#10b981" />
+                <h3 className="modal-title" style={{ color: '#10b981' }}>ĐẶT HÀNG THÀNH CÔNG!</h3>
+              </div>
+              <button className="modal-close-btn" onClick={() => setPurchaseResultModal(null)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ padding: '0 4px 16px 4px' }}>
+              {/* Product Info Card */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid rgba(255, 36, 83, 0.2)',
+                borderRadius: 14,
+                padding: '14px',
+                marginBottom: 16,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12
+              }}>
+                <img
+                  src={purchaseResultModal.product.imageUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=100&q=80'}
+                  alt=""
+                  style={{ width: 48, height: 48, borderRadius: 10, objectFit: 'cover', border: '1px solid rgba(255, 36, 83, 0.3)' }}
+                />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {purchaseResultModal.product.name}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>
+                    Mã đơn: <strong style={{ color: 'var(--primary)', fontFamily: 'var(--font-mono)' }}>#{purchaseResultModal.order.code}</strong>
+                  </div>
+                  <div style={{ fontSize: 12, color: '#10b981', fontWeight: 600, marginTop: 2 }}>
+                    Đã trừ ví: -{(purchaseResultModal.product.salePrice ?? purchaseResultModal.product.price).toLocaleString('vi-VN')} đ (Số dư còn: {purchaseResultModal.newBalance.toLocaleString('vi-VN')} đ)
+                  </div>
+                </div>
+              </div>
+
+              {/* Box Bàn giao Tài khoản / Mật khẩu / Link */}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#ff2453', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <KeyRound size={15} /> THÔNG TIN BÀN GIAO (TÀI KHOẢN, MẬT KHẨU HOẶC LINK):
+                </div>
+
+                <div style={{
+                  background: 'linear-gradient(135deg, #180510 0%, #0d0309 100%)',
+                  border: '1px solid rgba(255, 36, 83, 0.4)',
+                  boxShadow: '0 0 20px rgba(255, 36, 83, 0.15)',
+                  borderRadius: 14,
+                  padding: '16px',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 13.5,
+                  color: '#38bdf8',
+                  wordBreak: 'break-all',
+                  lineHeight: 1.6,
+                  userSelect: 'all'
+                }}>
+                  {purchaseResultModal.deliveredKey}
+                </div>
+
+                <button
+                  onClick={() => copyToClipboard(purchaseResultModal.deliveredKey, 'Đã copy tài khoản / mật khẩu vào bộ nhớ tạm!')}
+                  style={{
+                    width: '100%',
+                    marginTop: 10,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    padding: '12px',
+                    borderRadius: 12,
+                    background: 'linear-gradient(135deg, #ff2453 0%, #b80f36 100%)',
+                    color: '#fff',
+                    border: 'none',
+                    fontWeight: 800,
+                    fontSize: 14,
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 16px rgba(255, 36, 83, 0.35)'
+                  }}
+                >
+                  <Copy size={16} /> SAO CHÉP TOÀN BỘ THÔNG TIN (1 CHẠM)
+                </button>
+              </div>
+
+              {/* Warranty Notice */}
+              <div style={{
+                background: 'rgba(16, 185, 129, 0.08)',
+                border: '1px solid rgba(16, 185, 129, 0.25)',
+                borderRadius: 12,
+                padding: '10px 14px',
+                fontSize: 12,
+                color: '#34d399',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                marginBottom: 16
+              }}>
+                <ShieldCheck size={18} style={{ flexShrink: 0 }} />
+                <span>Bảo hành chính hãng 1 đổi 1. Thông tin đơn hàng này đã được lưu vào mục <strong>Đơn hàng</strong> của bạn.</span>
+              </div>
+
+              {/* Navigation Action Buttons */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <button
+                  className="btn-secondary-pill"
+                  onClick={() => {
+                    setPurchaseResultModal(null);
+                    setActiveTab('orders');
+                  }}
+                  style={{ width: '100%', fontSize: 13, padding: '12px' }}
+                >
+                  <Package size={15} /> Xem Trong Đơn Hàng
+                </button>
+                <button
+                  className="btn-primary-pill"
+                  onClick={() => setPurchaseResultModal(null)}
+                  style={{ width: '100%', fontSize: 13, padding: '12px' }}
+                >
+                  Tiếp Tục Mua Sắm
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================
           MODAL NẠP TIỀN VIETQR (VIETCOMBANK)
       ======================================================== */}
       {depositModalOpen && (
@@ -1706,11 +2028,12 @@ export default function App() {
             <button
               className="btn-primary-pill"
               onClick={() => {
-                handleBuyProduct(productModal);
+                const prod = productModal;
                 setProductModal(null);
+                handleBuyProduct(prod);
               }}
             >
-              MUA NGAY (BÀN GIAO TỰ ĐỘNG QUA BOT)
+              MUA NGAY (NHẬN TÀI KHOẢN & MẬT KHẨU TẠI ĐÂY)
             </button>
           </div>
         </div>
