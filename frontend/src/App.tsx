@@ -1115,7 +1115,6 @@ export default function App() {
               <div className="profile-rank-badge">
                 <span>👑</span>
                 <b>MEMBER</b>
-                <span>★ ĐỒNG</span>
               </div>
             </div>
 

@@ -761,31 +761,13 @@ if (botToken) {
     });
     const totalSpent = orders.reduce((sum, o) => sum + Number(o.total), 0);
 
-    let rankCustomEmojiId = '5282750778409233531'; // 🥉
-    let rankFallback = '🥉';
-    let rankName = 'Đồng';
-    if (totalSpent >= 2000000) {
-      rankCustomEmojiId = '5471952986970267163'; // 💎
-      rankFallback = '💎';
-      rankName = 'Kim Cương';
-    } else if (totalSpent >= 500000) {
-      rankCustomEmojiId = '5280735858926822987'; // 🥇
-      rankFallback = '🥇';
-      rankName = 'Vàng';
-    } else if (totalSpent >= 100000) {
-      rankCustomEmojiId = '5283195573812340110'; // 🥈
-      rankFallback = '🥈';
-      rankName = 'Bạc';
-    }
-
-    const fullName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || user.username || 'Khách hàng';
+    const fullName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || ctx.from.first_name || user.username || 'Khách hàng';
     const botUsername = (process.env.TELEGRAM_BOT_USERNAME || 'tainguyenhai1110_bot').replace('@', '');
     const refLink = `https://t.me/${botUsername}?start=ref_${telegramId}`;
 
     const text =
       `<tg-emoji emoji-id="5787508383145791969">👋</tg-emoji> Xin chào: 🪽 <b>${fullName}</b> 🪽\n` +
       `<tg-emoji emoji-id="5787588003249524398">🎅</tg-emoji> <b>ID:</b> <code>${telegramId}</code>\n` +
-      `<tg-emoji emoji-id="5332547853304734597">🎖</tg-emoji> <b>Hạng:</b> <tg-emoji emoji-id="${rankCustomEmojiId}">${rankFallback}</tg-emoji> <b>${rankName}</b>\n` +
       `<tg-emoji emoji-id="5375296873982604963">💰</tg-emoji> <b>Chi tiêu:</b> ${totalSpent.toLocaleString('vi-VN')}đ\n` +
       `━━━━━━━━━━━━━━━━━━━━\n` +
       `<blockquote><tg-emoji emoji-id="5787664479437197928">✨</tg-emoji> Link giới thiệu: ${refLink} ❞</blockquote>\n\n` +
@@ -1067,14 +1049,7 @@ if (botToken) {
     const deliveredOrders = orders.filter(o => o.status === 'DELIVERED');
     const totalSpent = deliveredOrders.reduce((sum, o) => sum + Number(o.total), 0);
 
-    let rankCustomEmojiId = '5282750778409233531'; // 🥉
-    let rankFallback = '🥉';
-    let rankName = 'Đồng';
-    if (totalSpent >= 2000000) { rankCustomEmojiId = '5471952986970267163'; rankFallback = '💎'; rankName = 'Kim Cương'; }
-    else if (totalSpent >= 500000) { rankCustomEmojiId = '5280735858926822987'; rankFallback = '🥇'; rankName = 'Vàng'; }
-    else if (totalSpent >= 100000) { rankCustomEmojiId = '5283195573812340110'; rankFallback = '🥈'; rankName = 'Bạc'; }
-
-    const fullName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || user.username || 'Khách hàng';
+    const fullName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || ctx.from.first_name || user.username || 'Khách hàng';
     const botUsername = (process.env.TELEGRAM_BOT_USERNAME || 'tainguyenhai1110_bot').replace('@', '');
     const refLink = `https://t.me/${botUsername}?start=ref_${telegramId}`;
 
@@ -1083,7 +1058,6 @@ if (botToken) {
       `━━━━━━━━━━━━━━━━━━━━\n` +
       `Xin chào: 🪽 <b>${fullName}</b> 🪽\n` +
       `🎅 ID: <code>${telegramId}</code>\n` +
-      `🎖️ Hạng: ${rankFallback} ${rankName}\n` +
       `💰 Chi tiêu: <b>${totalSpent.toLocaleString('vi-VN')}đ</b>\n` +
       `👛 Số dư ví: <b>${Number(user.balance).toLocaleString('vi-VN')}đ</b>\n` +
       `📦 Đơn hàng đã mua: <b>${orders.length}</b> đơn\n` +
@@ -1617,8 +1591,9 @@ if (botToken) {
     await ctx.sendSticker('CAACAgEAAxUAAWro2cnnMsee-1LZyo8asXjsPDtPAAKlAgACRv7wRzjrsF8nFDx2PQQ').catch(() => {});
 
     const replyKb = getMainMenuKeyboard();
+    const userCallingName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || ctx.from.first_name || ctx.from.username || 'Quý khách';
     await ctx.reply(
-      `👋 Xin chào <b>${ctx.from.first_name || 'Quý khách'}</b>!\n` +
+      `👋 Xin chào <b>${userCallingName}</b>!\n` +
       `Chào mừng bạn đến với <b>Shop Hai1110#</b> — Bot tự động giao hàng 24/7!`,
       { parse_mode: 'HTML', ...replyKb }
     );
