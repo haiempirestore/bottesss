@@ -1,0 +1,134 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String        @id @default(cuid())
+  telegramId     String        @unique
+  username       String?
+  firstName      String?
+  lastName       String?
+  photoUrl       String?
+  balance        Float         @default(0)
+  isBlocked      Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  orders         Order[]
+  deposits       Deposit[]
+  transactions   Transaction[]
+}
+
+model Admin {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}
+
+model Category {
+  id          String     @id @default(cuid())
+  name        String
+  slug        String     @unique
+  description String?
+  imageUrl    String?
+  isActive    Boolean    @default(true)
+  sortOrder   Int        @default(0)
+  parentId    String?
+  parent      Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryTree")
+  products    Product[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Product {
+  id            String      @id @default(cuid())
+  categoryId    String
+  category      Category    @relation(fields: [categoryId], references: [id])
+  name          String
+  description   String?
+  price         Float
+  salePrice     Float?
+  imageUrl      String?
+  isActive      Boolean     @default(true)
+  stockItems    StockItem[]
+  orderItems    OrderItem[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model StockItem {
+  id          String    @id @default(cuid())
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id])
+  payload     String
+  status      String    @default("AVAILABLE")
+  soldAt      DateTime?
+  orderItemId String?
+  createdAt   DateTime  @default(now())
+  @@index([productId, status])
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  code        String      @unique
+  userId      String
+  user        User        @relation(fields: [userId], references: [id])
+  total       Float
+  status      String      @default("PENDING")
+  items       OrderItem[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model OrderItem {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id])
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  quantity  Int
+  unitPrice Float
+  delivered String?
+}
+
+model Deposit {
+  id          String    @id @default(cuid())
+  reference   String    @unique
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  amount      Float
+  status      String    @default("PENDING")
+  providerId  String?   @unique
+  createdAt   DateTime  @default(now())
+  paidAt      DateTime?
+}
+
+model Transaction {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  type      String
+  amount    Float
+  note      String?
+  createdAt DateTime @default(now())
+}
+
+model BotSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model AdminLog {
+  id        String   @id @default(cuid())
+  adminId   String?
+  action    String
+  detail    String?
+  createdAt DateTime @default(now())
+}

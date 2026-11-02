@@ -1,0 +1,25 @@
+{
+  "name": "telegram-shop",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": ["backend", "frontend"],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w backend\" \"npm run dev -w frontend\"",
+    "dev:backend": "npm run dev -w backend",
+    "dev:frontend": "npm run dev -w frontend",
+    "tunnel": "npx untun tunnel --port 4000",
+    "tunnel:localtunnel": "npx localtunnel --port 4000",
+    "build": "npm run build -w backend && npm run build -w frontend",
+    "deploy:pages": "npm run build -w frontend && npx gh-pages -d frontend/dist",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "admin:create": "tsx backend/src/scripts/create-admin.ts",
+    "test": "npm run test -w backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "prisma": "^6.2.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

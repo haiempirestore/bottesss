@@ -1,0 +1,14 @@
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: shop
+      POSTGRES_PASSWORD: shop_password
+      POSTGRES_DB: telegram_shop
+    ports:
+      - "5432:5432"
+    volumes:
+      - shop_db:/var/lib/postgresql/data
+volumes:
+  shop_db:

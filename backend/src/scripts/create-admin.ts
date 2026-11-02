@@ -1,0 +1,13 @@
+import 'dotenv/config';
+import bcrypt from 'bcryptjs';
+import { PrismaClient } from '@prisma/client';
+const prisma = new PrismaClient();
+const args = process.argv.slice(2);
+const value = (key: string) => args[args.indexOf(key) + 1];
+const email = value('--email') || process.env.ADMIN_EMAIL;
+const password = value('--password');
+if (!email || !password || password.length < 12) throw new Error('Usage: npm run admin:create -- --email admin@example.com --password a-12-char-password');
+const passwordHash = await bcrypt.hash(password, 12);
+await prisma.admin.upsert({ where: { email }, update: { passwordHash }, create: { email, passwordHash } });
+console.log(`Admin created/updated: ${email}`);
+await prisma.$disconnect();
