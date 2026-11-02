@@ -1324,12 +1324,17 @@ export default function App() {
               ))}
             </div>
 
-            {/* Mã QR VietQR Vietcombank */}
-            <div className="qr-preview-box">
+            {/* Khung mã QR Chuyển khoản Thỏ Siêu thị MMO chuẩn mẫu */}
+            <div className="bunny-qr-container">
+              <img src="./bunny_vietqr_template.png" alt="Khung QR Chuyển khoản" className="bunny-qr-template" />
               <img
-                src={`https://img.vietqr.io/image/970436-HAI100TR-compact2.png?amount=${depositAmount}&addInfo=NAP${profile?.telegramId || '6632274262'}&accountName=NGUYEN%20HOANG%20HAI`}
-                alt="VietQR Vietcombank"
+                src={`https://img.vietqr.io/image/970436-HAI100TR-qr_only.png?amount=${depositAmount}&addInfo=NAP${profile?.telegramId || '6632274262'}&accountName=NGUYEN%20HOANG%20HAI`}
+                alt="Mã QR Vietcombank"
+                className="bunny-qr-code-overlay"
               />
+              <div className="bunny-qr-amount-overlay">
+                {depositAmount.toLocaleString('vi-VN')}đ
+              </div>
             </div>
 
             {/* Thông tin chuyển khoản */}

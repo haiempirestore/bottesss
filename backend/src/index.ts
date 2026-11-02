@@ -7,6 +7,7 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { Telegraf, Markup } from 'telegraf';
 import QRCode from 'qrcode';
+import sharp from 'sharp';
 import { prisma } from './db.js';
 import { verifyTelegramInitData, signUser, userAuth, adminAuth, signAdmin } from './security.js';
 import crypto from 'node:crypto';
@@ -649,45 +650,48 @@ function buildVietQrEmvco(bankBin: string, accountNo: string, amount: number, me
 }
 
 async function generateVietQrBuffer(bank: string, accountNo: string, accountName: string, amount: number, ref: string): Promise<Buffer | null> {
-  // Ưu tiên 1: Lấy mẫu VietQR giao diện đẹp từ API chính thức
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 2500);
-    const res = await fetch('https://api.vietqr.io/v2/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        accountNo,
-        accountName,
-        acqId: bank,
-        amount,
-        addInfo: ref,
-        format: 'text',
-        template: 'compact2'
-      }),
-      signal: controller.signal
-    });
-    clearTimeout(timeout);
-    if (res.ok) {
-      const data: any = await res.json();
-      if (data?.data?.qrDataURL) {
-        const base64Data = data.data.qrDataURL.replace(/^data:image\/\w+;base64,/, '');
-        return Buffer.from(base64Data, 'base64');
-      }
-      if (data?.data?.qrCode) {
-        return await QRCode.toBuffer(data.data.qrCode, { type: 'png', margin: 2, width: 450 });
-      }
-    }
-  } catch (_e) {
-    // API mạng ngoài bận hoặc chậm -> Tự động chuyển qua tạo cục bộ
-  }
-
-  // Ưu tiên 2: Tự tạo chuỗi EMVCo VietQR chuẩn NAPAS cục bộ (100% không lo lỗi mạng hay Telegram từ chối)
   try {
     const emvco = buildVietQrEmvco(bank, accountNo, amount, ref);
-    return await QRCode.toBuffer(emvco, { type: 'png', margin: 2, width: 450 });
+
+    // Tạo mã QR chuẩn NAPAS kích thước 224x224
+    const qrPng = await QRCode.toBuffer(emvco, {
+      type: 'png',
+      margin: 1,
+      width: 224,
+      errorCorrectionLevel: 'M',
+      color: { dark: '#0c1829', light: '#ffffff' }
+    });
+
+    const templatePath = path.resolve(__dirname, '../assets/bunny_vietqr_template.png');
+    if (fs.existsSync(templatePath)) {
+      const formattedAmount = `${amount.toLocaleString('vi-VN')}đ`;
+      const svgText = Buffer.from(`
+        <svg width="894" height="908">
+          <style>
+            .amount {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              font-size: 33px;
+              font-weight: 900;
+              fill: #0c1829;
+              letter-spacing: -0.5px;
+            }
+          </style>
+          <text x="622" y="863" text-anchor="middle" dominant-baseline="central" class="amount">${formattedAmount}</text>
+        </svg>
+      `);
+
+      return await sharp(templatePath)
+        .composite([
+          { input: qrPng, left: 512, top: 386 },
+          { input: svgText, left: 0, top: 0 }
+        ])
+        .jpeg({ quality: 95 })
+        .toBuffer();
+    }
+
+    return qrPng;
   } catch (err) {
-    console.error('Lỗi tạo mã QR cục bộ:', err);
+    console.error('Lỗi tạo mã QR chuyển khoản template:', err);
     return null;
   }
 }

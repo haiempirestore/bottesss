@@ -1145,7 +1145,48 @@ body {
   to { transform: translate(-50%, 0); opacity: 1; }
 }
 
-/* Deposit QR Box */
+/* Deposit QR Box — Khung Thỏ Siêu thị MMO chuẩn mẫu người dùng */
+.bunny-qr-container {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), 0 0 20px rgba(44, 93, 133, 0.25);
+  background: #09121d;
+}
+
+.bunny-qr-template {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.bunny-qr-code-overlay {
+  position: absolute;
+  left: 57.27%;
+  top: 42.51%;
+  width: 25.05%;
+  height: 24.67%;
+  object-fit: contain;
+  background: #ffffff;
+}
+
+.bunny-qr-amount-overlay {
+  position: absolute;
+  left: 69.57%;
+  top: 95.04%;
+  transform: translate(-50%, -50%);
+  font-size: clamp(11px, 3.8vw, 13px);
+  font-weight: 900;
+  color: #0c1829;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  letter-spacing: -0.3px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 .qr-preview-box {
   background: #ffffff;
   padding: 12px;
