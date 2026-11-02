@@ -387,6 +387,10 @@ async function processOrderDelivery(telegramId: string, username: string | undef
   };
 }
 
+// ============================================================
+// BOT TELEGRAM — TÍCH HỢP ĐẦY ĐỦ MENU SẢN PHẨM & MUA HÀNG & VIETQR
+// ============================================================
+
 let bot: Telegraf | undefined;
 if (botToken) {
   bot = new Telegraf(botToken);
@@ -408,40 +412,262 @@ if (botToken) {
 
   // 2. Cấu hình danh sách lệnh cho thanh Menu Telegram
   bot.telegram.setMyCommands([
-    { command: 'start', description: 'Mở cửa hàng & xem sản phẩm' },
-    { command: 'menu', description: 'Bật menu phím bấm Mini App' },
-    { command: 'shop', description: 'Mở cửa hàng Mini App' },
-    { command: 'orders', description: 'Lịch sử mua hàng & nhận key' },
-    { command: 'help', description: 'Hướng dẫn mua sắm' },
-    { command: 'support', description: 'Hỗ trợ khách hàng' }
-  ]).then(() => console.log('✅ Đã cấu hình danh sách lệnh Bot (/start, /menu, /shop...)'))
+    { command: 'start', description: 'Khởi động & Mở Menu Shop' },
+    { command: 'products', description: '🛍 Danh sách sản phẩm đang bán' },
+    { command: 'nap', description: '💳 Nạp tiền vào ví qua VietQR' },
+    { command: 'me', description: '👤 Xem số dư ví & thông tin tài khoản' },
+    { command: 'orders', description: '📦 Đơn hàng đã mua & nhận key' },
+    { command: 'support', description: '💬 Liên hệ hỗ trợ kỹ thuật' }
+  ]).then(() => console.log('✅ Đã cấu hình danh sách lệnh Bot (/start, /products, /nap...)'))
     .catch(err => console.error('Lỗi setMyCommands:', err));
 
-  // Hàm tạo bàn phím menu mở Mini App chuẩn
-  function createMenuKeyboards(url: string) {
-    if (url.startsWith('https://')) {
-      return {
-        inline: Markup.inlineKeyboard([
-          [Markup.button.webApp('🛍 MỞ CỬA HÀNG', url)]
-        ]),
-        reply: Markup.keyboard([
-          [Markup.button.webApp('🛍 MỞ CỬA HÀNG TRỰC TIẾP', url)],
-          ['📦 Lịch sử đơn hàng', '💬 Hỗ trợ']
-        ]).resize()
-      };
+  // Bàn phím chính ghim ở chân khung chat (Reply Keyboard)
+  function getMainMenuKeyboard() {
+    const rows: any[] = [
+      ['🛍 Xem Sản Phẩm', '💳 Nạp Tiền VietQR'],
+      ['👤 Ví & Tài Khoản', '📦 Đơn Hàng Của Tôi']
+    ];
+    if (miniAppUrl.startsWith('https://')) {
+      rows.push([Markup.button.webApp('🌐 Mở Mini App (Giao Diện Web)', miniAppUrl)]);
     }
-    return {
-      inline: Markup.inlineKeyboard([
-        [Markup.button.url('🛍 Mở trang Web', url || 'https://haiempirestore.github.io/bottesss/')]
-      ]),
-      reply: Markup.keyboard([['🛍 Mở Cửa Hàng', '💬 Hỗ trợ']]).resize()
-    };
+    rows.push(['💬 Hỗ Trợ 24/7']);
+    return Markup.keyboard(rows).resize();
   }
+
+  // Gửi Menu Danh mục sản phẩm (Inline Keyboard)
+  async function sendCategoriesMenu(ctx: any) {
+    const categories = await prisma.category.findMany({
+      where: { isActive: true },
+      include: {
+        products: { where: { isActive: true } }
+      },
+      orderBy: { sortOrder: 'asc' }
+    });
+
+    if (categories.length === 0) {
+      return ctx.reply('⚠️ Hiện tại cửa hàng chưa có danh mục nào.');
+    }
+
+    const buttons: any[] = categories.map(c => [
+      Markup.button.callback(`📂 ${c.name} (${c.products.length} SP)`, `cat:${c.id}`)
+    ]);
+
+    if (miniAppUrl.startsWith('https://')) {
+      buttons.push([Markup.button.webApp('🌐 Mở Mini App xem ảnh & chi tiết', miniAppUrl)]);
+    }
+
+    const text =
+      `🛍 DANH MỤC HÀNG HÓA TẠI SHOP HAI1110#\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `Vui lòng bấm chọn nhóm sản phẩm bạn quan tâm bên dưới để xem danh sách & mua hàng:`;
+
+    if (ctx.callbackQuery) {
+      await ctx.editMessageText(text, Markup.inlineKeyboard(buttons)).catch(async () => {
+        await ctx.reply(text, Markup.inlineKeyboard(buttons));
+      });
+    } else {
+      await ctx.reply(text, Markup.inlineKeyboard(buttons));
+    }
+  }
+
+  // Gửi danh sách sản phẩm trong 1 danh mục
+  async function sendProductsOfCategory(ctx: any, categoryId: string) {
+    const category = await prisma.category.findUnique({ where: { id: categoryId } });
+    if (!category) return ctx.reply('❌ Danh mục không tồn tại.');
+
+    const products = await prisma.product.findMany({
+      where: { categoryId, isActive: true },
+      include: {
+        stockItems: { where: { status: 'AVAILABLE' } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    if (products.length === 0) {
+      const backBtn = Markup.inlineKeyboard([[Markup.button.callback('⬅️ Quay lại danh mục', 'view_cats')]]);
+      const emptyText = `📂 Danh mục: ${category.name}\nHiện tại chưa có sản phẩm nào.`;
+      if (ctx.callbackQuery) {
+        return ctx.editMessageText(emptyText, backBtn);
+      }
+      return ctx.reply(emptyText, backBtn);
+    }
+
+    let text =
+      `📂 DANH MỤC: ${category.name.toUpperCase()}\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `Chọn sản phẩm bạn muốn mua ngay bên dưới:\n\n`;
+
+    const buttons: any[] = [];
+    for (const p of products) {
+      const price = p.salePrice ?? p.price;
+      const stockCount = p.stockItems.length;
+      const stockBadge = stockCount > 0 ? `(Còn ${stockCount} key)` : `(Tạm hết)`;
+
+      text +=
+        `🔹 ${p.name}\n` +
+        `• Giá bán: ${price.toLocaleString('vi-VN')}đ ${p.salePrice ? `(Gốc: ${p.price.toLocaleString('vi-VN')}đ)` : ''}\n` +
+        `• Tình trạng: ${stockCount > 0 ? `🟢 Còn ${stockCount} SP trong kho` : '🔴 Tạm hết hàng'}\n` +
+        `• Mô tả: ${p.description || 'Sản phẩm kỹ thuật số chính hãng'}\n\n`;
+
+      if (stockCount > 0) {
+        buttons.push([
+          Markup.button.callback(`🛒 Mua: ${p.name.slice(0, 22)}... - ${price.toLocaleString('vi-VN')}đ`, `buy:${p.id}`)
+        ]);
+      }
+    }
+
+    buttons.push([Markup.button.callback('⬅️ Quay lại danh mục', 'view_cats')]);
+
+    if (ctx.callbackQuery) {
+      await ctx.editMessageText(text, Markup.inlineKeyboard(buttons)).catch(async () => {
+        await ctx.reply(text, Markup.inlineKeyboard(buttons));
+      });
+    } else {
+      await ctx.reply(text, Markup.inlineKeyboard(buttons));
+    }
+  }
+
+  // Menu Nạp tiền VietQR
+  async function sendDepositMenu(ctx: any) {
+    const text =
+      `💳 NẠP TIỀN VÀO VÍ SHOP TỰ ĐỘNG QUA VIETQR\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `• Ngân hàng: Quân Đội (MBBank)\n` +
+      `• STK nhận: HAI100TR\n` +
+      `• Chủ tài khoản: NGUYEN HOANG HAI\n` +
+      `• Nạp tiền tự động 24/7, không mất phí giao dịch.\n\n` +
+      `👇 Vui lòng chọn nhanh số tiền bạn muốn nạp:`;
+
+    const buttons = [
+      [Markup.button.callback('💵 20.000đ', 'nap:20000'), Markup.button.callback('💵 50.000đ', 'nap:50000')],
+      [Markup.button.callback('💵 100.000đ', 'nap:100000'), Markup.button.callback('💵 200.000đ', 'nap:200000')],
+      [Markup.button.callback('💵 500.000đ', 'nap:500000'), Markup.button.callback('💵 1.000.000đ', 'nap:1000000')]
+    ];
+
+    if (ctx.callbackQuery) {
+      await ctx.editMessageText(text, Markup.inlineKeyboard(buttons)).catch(async () => {
+        await ctx.reply(text, Markup.inlineKeyboard(buttons));
+      });
+    } else {
+      await ctx.reply(text, Markup.inlineKeyboard(buttons));
+    }
+  }
+
+  // Tạo & Gửi ảnh mã QR nạp tiền
+  async function sendVietQR(ctx: any, amount: number) {
+    const bank = process.env.VIETQR_BANK_ID || '970422';
+    const acc = process.env.VIETQR_ACCOUNT_NO || process.env.VIETQR_ACCOUNT_NUMBER || 'HAI100TR';
+    const name = process.env.VIETQR_ACCOUNT_NAME || 'NGUYEN HOANG HAI';
+    const teleId = ctx.from.id;
+    const ref = `NAP${teleId}`;
+    const qrUrl = `https://img.vietqr.io/image/${bank}-${acc}-compact2.png?amount=${amount}&addInfo=${ref}&accountName=${encodeURIComponent(name)}`;
+
+    const caption =
+      `📲 MÃ QR CHUYỂN KHOẢN NẠP TIỀN:\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `🏦 Ngân hàng: Quân Đội (MBBank)\n` +
+      `💳 Số tài khoản: ${acc}\n` +
+      `👤 Tên chủ TK: ${name}\n` +
+      `💰 Số tiền nạp: ${amount.toLocaleString('vi-VN')}đ\n` +
+      `🏷 Nội dung CK: ${ref} (BẮT BUỘC ĐÚNG)\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `👉 Mở ứng dụng ngân hàng của bạn quét mã QR ở trên để chuyển khoản.\n` +
+      `Sau khi chuyển khoản xong, bấm nút xác nhận bên dưới:`;
+
+    const buttons = Markup.inlineKeyboard([
+      [Markup.button.callback('✅ TÔI ĐÃ CHUYỂN KHOẢN XONG', `paid_nap:${amount}:${ref}`)],
+      [Markup.button.callback('⬅️ Đổi số tiền nạp khác', 'view_deposit_menu')]
+    ]);
+
+    await ctx.replyWithPhoto({ url: qrUrl }, { caption, ...buttons });
+  }
+
+  // Xem thông tin ví & tài khoản
+  async function sendAccountInfo(ctx: any) {
+    const user = await prisma.user.upsert({
+      where: { telegramId: String(ctx.from.id) },
+      update: { username: ctx.from.username, firstName: ctx.from.first_name },
+      create: { telegramId: String(ctx.from.id), username: ctx.from.username, firstName: ctx.from.first_name, balance: 200000 }
+    });
+
+    const orderCount = await prisma.order.count({ where: { userId: user.id } });
+
+    const text =
+      `👤 THÔNG TIN TÀI KHOẢN & VÍ CỦA BẠN:\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `🆔 Telegram ID: ${user.telegramId}\n` +
+      `👤 Họ tên: ${user.firstName || 'Khách hàng'} ${user.username ? `(@${user.username})` : ''}\n` +
+      `💰 Số dư ví hiện tại: ${Number(user.balance).toLocaleString('vi-VN')}đ\n` +
+      `🛍 Tổng đơn hàng đã mua: ${orderCount} đơn\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `Bạn có thể nạp thêm tiền hoặc dùng số dư để mua tài khoản/key ngay lập tức.`;
+
+    const buttons = Markup.inlineKeyboard([
+      [Markup.button.callback('💳 Nạp Thêm Tiền', 'view_deposit_menu')],
+      [Markup.button.callback('🛍 Mua Sắm Ngay', 'view_cats'), Markup.button.callback('📦 Xem Đơn Đã Mua', 'view_orders')]
+    ]);
+
+    if (ctx.callbackQuery) {
+      await ctx.editMessageText(text, buttons).catch(async () => {
+        await ctx.reply(text, buttons);
+      });
+    } else {
+      await ctx.reply(text, buttons);
+    }
+  }
+
+  // Xem lịch sử đơn hàng
+  async function sendOrderHistory(ctx: any) {
+    const user = await prisma.user.findUnique({
+      where: { telegramId: String(ctx.from.id) },
+      include: {
+        orders: {
+          include: { items: { include: { product: true } } },
+          orderBy: { createdAt: 'desc' },
+          take: 5
+        }
+      }
+    });
+
+    if (!user || user.orders.length === 0) {
+      const emptyBtn = Markup.inlineKeyboard([[Markup.button.callback('🛍 Mua Hàng Ngay', 'view_cats')]]);
+      const emptyText = '📦 Bạn chưa có đơn hàng nào tại cửa hàng. Hãy chọn mua các sản phẩm đang có sẵn nhé!';
+      if (ctx.callbackQuery) {
+        return ctx.editMessageText(emptyText, emptyBtn);
+      }
+      return ctx.reply(emptyText, emptyBtn);
+    }
+
+    let text = `📦 LỊCH SỬ ĐƠN HÀNG CỦA BẠN (5 đơn gần nhất):\n━━━━━━━━━━━━━━━━━━━━\n`;
+    for (const o of user.orders) {
+      text += `🔖 Mã đơn: ${o.code} | Ngày: ${o.createdAt.toLocaleDateString('vi-VN')}\n`;
+      text += `💰 Tổng tiền: ${Number(o.total).toLocaleString('vi-VN')}đ\n`;
+      for (const item of o.items) {
+        text += `• ${item.product.name} (SL: ${item.quantity})\n`;
+        if (item.delivered) {
+          text += `  🔑 BÀN GIAO:\n${item.delivered}\n`;
+        }
+      }
+      text += `━━━━━━━━━━━━━━━━━━━━\n`;
+    }
+
+    const buttons = Markup.inlineKeyboard([[Markup.button.callback('🛍 Mua Thêm Sản Phẩm', 'view_cats')]]);
+
+    if (ctx.callbackQuery) {
+      await ctx.editMessageText(text, buttons).catch(async () => {
+        await ctx.reply(text, buttons);
+      });
+    } else {
+      await ctx.reply(text, buttons);
+    }
+  }
+
+  // --- CÁC SỰ KIỆN LỆNH & TIN NHẮN CỦA BOT ---
 
   bot.start(async ctx => {
     const payload = (ctx as any).startPayload;
 
-    // Xử lý khi khách bấm "MUA NGAY" từ GitHub Pages (deep-link ?start=buy_xxx)
+    // Xử lý deep-link mua hàng: ?start=buy_xxx
     if (payload && payload.startsWith('buy_')) {
       const prodId = payload.replace('buy_', '');
       const res = await processOrderDelivery(String(ctx.from.id), ctx.from.username, ctx.from.first_name, prodId);
@@ -451,123 +677,141 @@ if (botToken) {
       return ctx.reply(res.message);
     }
 
-    // Xử lý nạp tiền deep-link ?start=nap_xxx
+    // Xử lý deep-link nạp tiền: ?start=nap_xxx
     if (payload && payload.startsWith('nap_')) {
       const amount = Number(payload.replace('nap_', '')) || 50000;
-      const bank = process.env.VIETQR_BANK_ID || '970422';
-      const acc = process.env.VIETQR_ACCOUNT_NO || process.env.VIETQR_ACCOUNT_NUMBER || 'HAI100TR';
-      const name = process.env.VIETQR_ACCOUNT_NAME || 'NGUYEN HOANG HAI';
-      const ref = `NAP${ctx.from.id}`;
-      const qrUrl = `https://img.vietqr.io/image/${bank}-${acc}-compact2.png?amount=${amount}&addInfo=${ref}&accountName=${encodeURIComponent(name)}`;
-      return ctx.replyWithPhoto(
-        { url: qrUrl },
-        {
-          caption:
-            `📲 THÔNG TIN CHUYỂN KHOẢN VIETQR:\n` +
-            `• Ngân hàng: MBBank\n` +
-            `• Số tài khoản: ${acc}\n` +
-            `• Chủ tài khoản: ${name}\n` +
-            `• Số tiền: ${amount.toLocaleString('vi-VN')}đ\n` +
-            `• Nội dung CK: ${ref}\n\n` +
-            `Hệ thống sẽ tự động cập nhật số dư sau khi nhận chuyển khoản!`
-        }
-      );
+      return sendVietQR(ctx, amount);
     }
 
-    const kb = createMenuKeyboards(miniAppUrl);
+    const replyKb = getMainMenuKeyboard();
     await ctx.reply(
       `👋 Xin chào ${ctx.from.first_name || 'bạn'}!\n` +
-      `Chào mừng bạn đến với Shop Hai1110# — Hệ thống phân phối tài khoản & key bản quyền tự động.\n\n` +
-      `👇 Bấm vào nút bên dưới để mở Mini App và chọn sản phẩm:`,
-      kb.inline
+      `Chào mừng bạn đến với Shop Hai1110# — Hệ thống phân phối tài khoản & key bản quyền tự động 24/7.\n\n` +
+      `👇 Bạn có thể mua hàng trực tiếp bằng phím bấm bên dưới hoặc mở Mini App Web:`,
+      replyKb
     );
-    // Gửi thêm bàn phím ghim ở chân màn hình
-    await ctx.reply('Hoặc chọn menu nhanh:', kb.reply);
+
+    // Gửi luôn danh mục sản phẩm để khách chọn ngay
+    await sendCategoriesMenu(ctx);
   });
 
-  // Lệnh /menu và /shop
-  bot.command(['menu', 'shop'], async ctx => {
-    const kb = createMenuKeyboards(miniAppUrl);
-    await ctx.reply('🛍 Mời bạn mở cửa hàng Mini App:', kb.inline);
+  // Xử lý các nút bấm bàn phím cố định
+  bot.hears(['🛍 Xem Sản Phẩm', '🛍 Danh Sách Hàng', 'Sản phẩm', 'Danh mục'], ctx => sendCategoriesMenu(ctx));
+  bot.hears(['💳 Nạp Tiền VietQR', '💳 Nạp Tiền', 'Nạp tiền'], ctx => sendDepositMenu(ctx));
+  bot.hears(['👤 Ví & Tài Khoản', '👤 Tài Khoản / Ví', 'Tài khoản', 'Số dư'], ctx => sendAccountInfo(ctx));
+  bot.hears(['📦 Đơn Hàng Của Tôi', '📦 Lịch sử đơn hàng', 'Đơn hàng'], ctx => sendOrderHistory(ctx));
+  bot.hears(['💬 Hỗ Trợ 24/7', '💬 Hỗ trợ', 'Hỗ trợ'], ctx => {
+    ctx.reply(
+      `💬 TRUNG TÂM HỖ TRỢ KHÁCH HÀNG:\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `• Hỗ trợ Telegram: @haiempire\n` +
+      `• Hotline / Zalo: 0987.654.321\n` +
+      `• Thời gian làm việc: 24/7 mọi lúc\n\n` +
+      `Nếu có bất kỳ thắc mắc hoặc cần bảo hành sản phẩm, vui lòng nhắn tin trực tiếp cho Admin!`
+    );
   });
 
-  // Lệnh /orders - Xem lịch sử đơn hàng
-  bot.command('orders', async ctx => {
-    const user = await prisma.user.findUnique({
-      where: { telegramId: String(ctx.from.id) },
-      include: {
-        orders: {
-          include: { items: { include: { product: true } } },
-          orderBy: { createdAt: 'desc' },
-          take: 5
-        }
-      }
-    });
-
-    if (!user || user.orders.length === 0) {
-      return ctx.reply('📦 Bạn chưa có đơn hàng nào. Hãy bấm /shop để xem các sản phẩm đang bán nhé!');
-    }
-
-    let text = `📦 LỊCH SỬ ĐƠN HÀNG CỦA BẠN (5 đơn gần nhất):\n━━━━━━━━━━━━━━━━━━━━\n`;
-    for (const o of user.orders) {
-      text += `Mã đơn: ${o.code} | Tổng: ${Number(o.total).toLocaleString('vi-VN')}đ\n`;
-      for (const item of o.items) {
-        text += `• ${item.product.name} (SL: ${item.quantity})\n`;
-        if (item.delivered) {
-          text += `  🔑 Key: ${item.delivered}\n`;
-        }
-      }
-      text += `━━━━━━━━━━━━━━━━━━━━\n`;
-    }
-    await ctx.reply(text);
-  });
-
-  bot.hears(['📦 Lịch sử đơn hàng', '📦 Lịch sử đơn'], async ctx => {
-    // Gọi lại logic orders
-    const user = await prisma.user.findUnique({
-      where: { telegramId: String(ctx.from.id) },
-      include: {
-        orders: {
-          include: { items: { include: { product: true } } },
-          orderBy: { createdAt: 'desc' },
-          take: 5
-        }
-      }
-    });
-    if (!user || user.orders.length === 0) {
-      return ctx.reply('📦 Bạn chưa có đơn hàng nào. Hãy bấm /shop để xem các sản phẩm nhé!');
-    }
-    let text = `📦 ĐƠN HÀNG GẦN NHẤT:\n`;
-    for (const o of user.orders) {
-      text += `\nĐơn: ${o.code} (${Number(o.total).toLocaleString('vi-VN')}đ)\n`;
-      for (const item of o.items) {
-        text += `• ${item.product.name}: ${item.delivered || 'Đang giao'}\n`;
-      }
-    }
-    await ctx.reply(text);
-  });
-
-  bot.hears(['menu', 'Menu', 'shop', 'Shop', 'cửa hàng', 'Cửa hàng'], async ctx => {
-    const kb = createMenuKeyboards(miniAppUrl);
-    await ctx.reply('🛍 Bấm nút để mở Mini App:', kb.inline);
-  });
-
+  // Lệnh văn bản (/products, /nap, /me, /orders, /support)
+  bot.command(['products', 'hang', 'shop'], ctx => sendCategoriesMenu(ctx));
+  bot.command(['nap', 'deposit'], ctx => sendDepositMenu(ctx));
+  bot.command(['me', 'vi', 'taikhoan'], ctx => sendAccountInfo(ctx));
+  bot.command('orders', ctx => sendOrderHistory(ctx));
+  bot.command('support', ctx => ctx.reply('💬 HỖ TRỢ: Vui lòng nhắn tin trực tiếp cho Admin qua Telegram: @haiempire'));
   bot.command('help', ctx => {
     ctx.reply(
-      `📖 HƯỚNG DẪN MUA SẮM:\n` +
-      `1. Bấm nút "🛍 MỞ CỬA HÀNG" ở góc dưới hoặc gõ /shop\n` +
-      `2. Chọn sản phẩm bạn muốn mua và bấm "MUA NGAY"\n` +
-      `3. Nếu chưa đủ số dư, quét mã VietQR để nạp tiền tự động\n` +
-      `4. Sau khi thanh toán thành công, hệ thống sẽ gửi tài khoản / key trực tiếp vào tin nhắn này!\n\n` +
-      `Cần hỗ trợ? Gõ /support để liên hệ Admin.`
+      `📖 HƯỚNG DẪN MUA SẮM TRÊN BOT:\n` +
+      `1. Chọn "🛍 Xem Sản Phẩm" để duyệt danh mục và chọn món cần mua.\n` +
+      `2. Bấm nút "🛒 MUA NGAY" -> Nếu đủ số dư, bot sẽ nhả mã/tài khoản ngay lập tức!\n` +
+      `3. Chọn "💳 Nạp Tiền VietQR" để quét mã chuyển khoản nạp tiền vào ví.\n` +
+      `4. Chọn "📦 Đơn Hàng Của Tôi" để xem lại các key đã mua bất kỳ lúc nào.\n\n` +
+      `Chúc bạn có trải nghiệm mua sắm tuyệt vời!`
     );
   });
 
-  bot.command(['support', 'hotro'], ctx => {
-    ctx.reply('💬 HỖ TRỢ KHÁCH HÀNG:\nVui lòng liên hệ Admin qua Telegram: @haiempire hoặc gọi hotline để được giải đáp 24/7.');
+  // --- XỬ LÝ CÁC NÚT BẤM INLINE (CALLBACK QUERIES) ---
+
+  // Khi chọn 1 danh mục
+  bot.action(/^cat:(.+)$/, async ctx => {
+    await ctx.answerCbQuery().catch(() => {});
+    const catId = ctx.match[1];
+    await sendProductsOfCategory(ctx, catId);
   });
-  bot.hears('💬 Hỗ trợ', ctx => {
-    ctx.reply('💬 HỖ TRỢ KHÁCH HÀNG:\nVui lòng liên hệ Admin qua Telegram: @haiempire để được giải đáp 24/7.');
+
+  // Khi bấm "Quay lại danh mục"
+  bot.action('view_cats', async ctx => {
+    await ctx.answerCbQuery().catch(() => {});
+    await sendCategoriesMenu(ctx);
+  });
+
+  // Khi bấm "Quay lại menu nạp tiền"
+  bot.action('view_deposit_menu', async ctx => {
+    await ctx.answerCbQuery().catch(() => {});
+    await sendDepositMenu(ctx);
+  });
+
+  // Khi bấm "Xem đơn hàng"
+  bot.action('view_orders', async ctx => {
+    await ctx.answerCbQuery().catch(() => {});
+    await sendOrderHistory(ctx);
+  });
+
+  // Khi bấm nút Nạp tiền nhanh (nap:20000, nap:50000...)
+  bot.action(/^nap:(\d+)$/, async ctx => {
+    await ctx.answerCbQuery().catch(() => {});
+    const amount = Number(ctx.match[1]);
+    await sendVietQR(ctx, amount);
+  });
+
+  // Khi bấm "✅ TÔI ĐÃ CHUYỂN KHOẢN XONG"
+  bot.action(/^paid_nap:(\d+):(.+)$/, async ctx => {
+    await ctx.answerCbQuery('Đã tiếp nhận yêu cầu!').catch(() => {});
+    const amount = Number(ctx.match[1]);
+    const ref = ctx.match[2];
+
+    // Ghi nhận deposit vào SQLite
+    const user = await prisma.user.upsert({
+      where: { telegramId: String(ctx.from.id) },
+      update: {},
+      create: { telegramId: String(ctx.from.id), username: ctx.from.username, firstName: ctx.from.first_name, balance: 200000 }
+    });
+
+    await prisma.deposit.upsert({
+      where: { reference: ref },
+      update: {},
+      create: {
+        reference: ref,
+        userId: user.id,
+        amount
+      }
+    }).catch(() => {});
+
+    await ctx.reply(
+      `✅ ĐÃ TIẾP NHẬN YÊU CẦU NẠP TIỀN!\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `💰 Số tiền nạp: ${amount.toLocaleString('vi-VN')}đ\n` +
+      `🏷 Mã giao dịch: ${ref}\n` +
+      `🏦 Ngân hàng nhận: MBBank (HAI100TR - NGUYEN HOANG HAI)\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `Hệ thống đang đối soát với ngân hàng MBBank. Số dư sẽ được tự động cộng vào ví của bạn trong 1 - 3 phút!`
+    );
+  });
+
+  // Khi bấm "🛒 MUA NGAY" trên Bot
+  bot.action(/^buy:(.+)$/, async ctx => {
+    await ctx.answerCbQuery().catch(() => {});
+    const prodId = ctx.match[1];
+    const res = await processOrderDelivery(String(ctx.from.id), ctx.from.username, ctx.from.first_name, prodId);
+
+    if (res.needsPayment && res.qrUrl) {
+      return ctx.replyWithPhoto({ url: res.qrUrl }, { caption: res.message });
+    }
+
+    const actionBtns = Markup.inlineKeyboard([
+      [Markup.button.callback('📦 Xem Lại Đơn Hàng', 'view_orders')],
+      [Markup.button.callback('🛍 Tiếp Tục Mua Sắm', 'view_cats')]
+    ]);
+
+    await ctx.reply(res.message, actionBtns);
   });
 
   // Nhận dữ liệu đặt hàng khi Mini App gửi qua Telegram.WebApp.sendData
@@ -593,7 +837,7 @@ if (botToken) {
 
   if ((process.env.BOT_MODE || 'polling') === 'polling') {
     bot.launch().then(() => {
-      console.log('🤖 Telegram Bot đã khởi chạy thành công (Polling mode)!');
+      console.log('🤖 Telegram Bot đã khởi chạy thành công với đầy đủ Menu mua hàng & VietQR!');
     }).catch(err => console.error('Bot launch failed', err));
   }
 }
