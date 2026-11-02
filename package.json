@@ -2,7 +2,10 @@
   "name": "telegram-shop",
   "private": true,
   "version": "1.0.0",
-  "workspaces": ["backend", "frontend"],
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
   "scripts": {
     "dev": "concurrently \"npm run dev -w backend\" \"npm run dev -w frontend\"",
     "dev:backend": "npm run dev -w backend",
@@ -18,9 +21,13 @@
     "test": "npm run test -w backend"
   },
   "devDependencies": {
+    "@types/qrcode": "^1.5.6",
     "concurrently": "^9.1.2",
     "prisma": "^6.2.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "qrcode": "^1.5.4"
   }
 }
