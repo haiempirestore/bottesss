@@ -102,7 +102,15 @@ app.post('/api/auth/telegram', async (req, res) => {
     if (user.isBlocked) return res.status(403).json({ error: 'Account blocked' });
     res.json({
       token: signUser(user.id),
-      user: { id: user.id, username: user.username, firstName: user.firstName, balance: user.balance }
+      user: {
+        id: user.id,
+        telegramId: user.telegramId,
+        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        photoUrl: user.photoUrl,
+        balance: user.balance
+      }
     });
   } catch (e) {
     res.status(500).json({ error: e instanceof Error ? e.message : 'Authentication failed' });

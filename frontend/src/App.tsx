@@ -72,6 +72,88 @@ function getInitialApi(): string {
   return '';
 }
 
+// Trích xuất dữ liệu người dùng thực tế từ Telegram WebApp SDK
+function getTelegramUser() {
+  const tg = typeof window !== 'undefined' ? window.Telegram?.WebApp : null;
+  // 1. Lấy từ initDataUnsafe.user do Telegram WebApp cung cấp
+  if (tg?.initDataUnsafe?.user?.id) {
+    return tg.initDataUnsafe.user;
+  }
+  // 2. Lấy từ chuỗi initData
+  if (tg?.initData) {
+    try {
+      const p = new URLSearchParams(tg.initData);
+      const uStr = p.get('user');
+      if (uStr) {
+        const u = JSON.parse(uStr);
+        if (u?.id) return u;
+      }
+    } catch {}
+  }
+  // 3. Lấy từ URL hash hoặc search (khi nhúng trong iframe web.telegram.org)
+  if (typeof window !== 'undefined') {
+    for (const source of [window.location.hash.slice(1), window.location.search.slice(1)]) {
+      if (!source) continue;
+      try {
+        const p = new URLSearchParams(source);
+        const raw = p.get('tgWebAppData') || p.get('initData');
+        if (raw) {
+          const sub = new URLSearchParams(raw);
+          const uStr = sub.get('user');
+          if (uStr) {
+            const u = JSON.parse(uStr);
+            if (u?.id) return u;
+          }
+        }
+        const directUser = p.get('user');
+        if (directUser) {
+          const u = JSON.parse(directUser);
+          if (u?.id) return u;
+        }
+      } catch {}
+    }
+  }
+  return null;
+}
+
+// Component hiển thị Avatar người dùng thực tế (nếu không có ảnh sẽ tạo avatar chữ cái đầu phong cách Neon)
+function UserAvatar({ name, photoUrl, size = 36 }: { name?: string; photoUrl?: string; size?: number }) {
+  const [imgError, setImgError] = useState(false);
+  const initial = (name || 'K').trim().charAt(0).toUpperCase();
+
+  if (photoUrl && !imgError) {
+    return (
+      <img
+        src={photoUrl}
+        alt={name || 'Avatar'}
+        onError={() => setImgError(true)}
+        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+      />
+    );
+  }
+
+  return (
+    <div
+      style={{
+        width: '100%',
+        height: '100%',
+        background: 'linear-gradient(135deg, #2e0d18 0%, #15060c 100%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#ff2453',
+        fontWeight: 800,
+        fontSize: Math.round(size * 0.44),
+        fontFamily: 'var(--font-display)',
+        textShadow: '0 0 10px rgba(255, 36, 83, 0.6)',
+        userSelect: 'none'
+      }}
+    >
+      {initial}
+    </div>
+  );
+}
+
 // Hàm phát âm thanh Ting giao dịch qua Web Audio API (không cần tải file ngoài)
 function playTingSound() {
   try {
@@ -128,13 +210,30 @@ export default function App() {
     accountName: 'NGUYEN HOANG HAI'
   });
 
-  // User Profile
-  const [profile, setProfile] = useState<any>({
-    telegramId: '6632274262',
-    firstName: '(tp) Hai1110#',
-    username: 'raw_hai1110',
-    balance: 0,
-    totalSpent: 0
+  // User Profile thực tế từ Telegram WebApp
+  const [profile, setProfile] = useState<any>(() => {
+    const u = typeof window !== 'undefined' ? getTelegramUser() : null;
+    if (u) {
+      const fullName = [u.first_name, u.last_name].filter(Boolean).join(' ') || u.first_name || 'Khách hàng';
+      return {
+        telegramId: String(u.id),
+        firstName: u.first_name || fullName,
+        fullName,
+        username: u.username || '',
+        photoUrl: u.photo_url || '',
+        balance: 0,
+        totalSpent: 0
+      };
+    }
+    return {
+      telegramId: '',
+      firstName: 'Khách hàng',
+      fullName: 'Khách hàng',
+      username: '',
+      photoUrl: '',
+      balance: 0,
+      totalSpent: 0
+    };
   });
 
   // Filter & Search
@@ -190,28 +289,54 @@ export default function App() {
     setTimeout(() => setCopiedText(null), 2000);
   };
 
-  // Khởi tạo nhận diện tài khoản Telegram
+  // Khởi tạo nhận diện tài khoản Telegram thực tế 100%
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
     tg?.ready();
     tg?.expand();
 
-    if (tg?.initDataUnsafe?.user) {
-      const u = tg.initDataUnsafe.user;
+    const u = getTelegramUser();
+    if (u) {
+      const fullName = [u.first_name, u.last_name].filter(Boolean).join(' ') || u.first_name || 'Khách hàng';
       setProfile((prev: any) => ({
         ...prev,
         telegramId: String(u.id),
-        firstName: u.first_name || prev.firstName,
-        username: u.username || prev.username,
-        photoUrl: u.photo_url || prev.photoUrl
+        firstName: u.first_name || fullName,
+        fullName,
+        username: u.username || '',
+        photoUrl: u.photo_url || prev.photoUrl || ''
       }));
+    }
+
+    // Nếu chạy qua backend API, đồng bộ thêm số dư tài khoản
+    if (apiUrl && tg?.initData) {
+      fetch(`${apiUrl}/api/auth/telegram`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initData: tg.initData })
+      })
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.user) {
+            setProfile((prev: any) => ({
+              ...prev,
+              telegramId: String(d.user.telegramId || d.user.id),
+              firstName: d.user.firstName || prev.firstName,
+              fullName: [d.user.firstName, d.user.lastName].filter(Boolean).join(' ') || d.user.firstName || prev.fullName,
+              username: d.user.username || prev.username,
+              photoUrl: d.user.photoUrl || prev.photoUrl,
+              balance: Number(d.user.balance || 0)
+            }));
+          }
+        })
+        .catch(() => {});
     }
 
     // Tự mở Admin nếu có hash #admin
     if (window.location.hash === '#admin') {
       setAdminModalOpen(true);
     }
-  }, []);
+  }, [apiUrl]);
 
   // Timer 2FA đếm lùi
   useEffect(() => {
@@ -378,11 +503,6 @@ export default function App() {
     }
   };
 
-  // Fallback avatar
-  const avatarUrl =
-    profile?.photoUrl ||
-    'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=150&auto=format&fit=crop&q=80';
-
   return (
     <>
       {/* Toast Notification */}
@@ -423,7 +543,7 @@ export default function App() {
           </div>
 
           <div className="header-avatar" onClick={() => setActiveTab('profile')}>
-            <img src={avatarUrl} alt="Avatar" />
+            <UserAvatar name={profile?.fullName || profile?.firstName} photoUrl={profile?.photoUrl} size={36} />
           </div>
         </div>
       </header>
@@ -440,7 +560,7 @@ export default function App() {
               <p className="sub-eyebrow">CHÀO MỪNG TRỞ LẠI</p>
               <div className="sub-title-row">
                 <h1 className="sub-title">
-                  Xin chào, {profile?.firstName || '(tp) Hai1110#'} <span className="sparkle">✦</span>
+                  Xin chào, {profile?.fullName || profile?.firstName || 'Khách hàng'} <span className="sparkle">✦</span>
                 </h1>
                 <div className="member-badge">
                   <span>👑</span>
@@ -986,10 +1106,12 @@ export default function App() {
             {/* Avatar Hero */}
             <div className="profile-hero">
               <div className="profile-avatar-large">
-                <img src={avatarUrl} alt="Avatar" />
+                <UserAvatar name={profile?.fullName || profile?.firstName} photoUrl={profile?.photoUrl} size={82} />
               </div>
-              <h2 className="profile-name">{profile?.firstName || '(tp)'}</h2>
-              <span className="profile-username">@{profile?.username || 'raw_hai1110'}</span>
+              <h2 className="profile-name">{profile?.fullName || profile?.firstName || 'Khách hàng'}</h2>
+              <span className="profile-username">
+                {profile?.username ? `@${profile.username}` : profile?.telegramId ? `ID: ${profile.telegramId}` : '@khach_hang'}
+              </span>
               <div className="profile-rank-badge">
                 <span>👑</span>
                 <b>MEMBER</b>
