@@ -287,15 +287,153 @@ app.post('/api/admin/stock/import', adminAuth, async (req, res) => {
   res.json({ imported: result.count });
 });
 
+// Xuất danh mục & sản phẩm ra file products.json cho GitHub Pages chạy không cần tunnel/VPS
+app.post('/api/admin/export-githubpage', adminAuth, async (_req, res) => {
+  try {
+    const [categories, products] = await Promise.all([
+      prisma.category.findMany({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } }),
+      prisma.product.findMany({ where: { isActive: true }, include: { category: true }, orderBy: { createdAt: 'desc' } })
+    ]);
+    const data = {
+      botUsername: process.env.TELEGRAM_BOT_USERNAME || 'TaiNguyenGiaReBot',
+      bankConfig: {
+        bankId: process.env.VIETQR_BANK_ID || '970422',
+        accountNo: process.env.VIETQR_ACCOUNT_NO || process.env.VIETQR_ACCOUNT_NUMBER || '',
+        accountName: process.env.VIETQR_ACCOUNT_NAME || ''
+      },
+      categories,
+      products
+    };
+    const fs = await import('node:fs/promises');
+    await fs.writeFile(path.resolve(__dirname, '../../frontend/public/products.json'), JSON.stringify(data, null, 2));
+    await fs.writeFile(path.resolve(__dirname, '../../githubpage/products.json'), JSON.stringify(data, null, 2));
+    res.json({ ok: true, count: products.length, message: 'Đã xuất thành công sản phẩm ra githubpage/products.json' });
+  } catch (e) {
+    res.status(500).json({ error: (e as Error).message });
+  }
+});
+
+// Xử lý đơn hàng trực tiếp qua Bot Telegram (Không cần Tunnel, Không cần VPS)
+async function processOrderDelivery(telegramId: string, username: string | undefined, firstName: string | undefined, productId: string) {
+  const product = await prisma.product.findFirst({
+    where: { OR: [{ id: productId }, { name: { contains: productId } }], isActive: true }
+  });
+  if (!product) return { ok: false, message: '❌ Sản phẩm không tồn tại hoặc đã ngừng bán.' };
+
+  const stock = await prisma.stockItem.findFirst({
+    where: { productId: product.id, status: 'AVAILABLE' }
+  });
+  if (!stock) return { ok: false, message: `⚠️ Sản phẩm "${product.name}" hiện đang tạm hết hàng trong kho. Vui lòng quay lại sau nhé!` };
+
+  const user = await prisma.user.upsert({
+    where: { telegramId: String(telegramId) },
+    update: { username, firstName },
+    create: { telegramId: String(telegramId), username, firstName, balance: 200000 }
+  });
+
+  const price = product.salePrice ?? product.price;
+
+  if (user.balance >= price) {
+    const code = `DH${Date.now()}${crypto.randomInt(100, 999)}`;
+    await prisma.$transaction([
+      prisma.stockItem.update({ where: { id: stock.id }, data: { status: 'SOLD', soldAt: new Date() } }),
+      prisma.user.update({ where: { id: user.id }, data: { balance: { decrement: price } } }),
+      prisma.transaction.create({ data: { userId: user.id, type: 'PURCHASE', amount: -price, note: product.name } }),
+      prisma.order.create({
+        data: {
+          code,
+          userId: user.id,
+          total: price,
+          status: 'DELIVERED',
+          items: {
+            create: { productId: product.id, quantity: 1, unitPrice: price, delivered: stock.payload }
+          }
+        }
+      })
+    ]);
+    return {
+      ok: true,
+      message:
+        `🎉 ĐẶT HÀNG THÀNH CÔNG!\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `📦 Sản phẩm: ${product.name}\n` +
+        `💰 Đơn giá: ${price.toLocaleString('vi-VN')}đ\n` +
+        `💳 Số dư còn lại: ${(user.balance - price).toLocaleString('vi-VN')}đ\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `🔑 THÔNG TIN GIAO HÀNG:\n${stock.payload}\n\n` +
+        `Cảm ơn bạn đã tin tưởng mua sắm tại Shop Hai1110#!`
+    };
+  }
+
+  const bank = process.env.VIETQR_BANK_ID || '970422';
+  const accountNo = process.env.VIETQR_ACCOUNT_NO || process.env.VIETQR_ACCOUNT_NUMBER || '';
+  const accountName = process.env.VIETQR_ACCOUNT_NAME || '';
+  const ref = `NAP${telegramId}`;
+  const qrUrl = `https://img.vietqr.io/image/${bank}-${accountNo}-compact2.png?amount=${price}&addInfo=${ref}&accountName=${encodeURIComponent(accountName)}`;
+
+  return {
+    ok: false,
+    needsPayment: true,
+    qrUrl,
+    message:
+      `⚠️ Số dư không đủ để thanh toán "${product.name}" (${price.toLocaleString('vi-VN')}đ).\n` +
+      `Số dư hiện tại của bạn: ${user.balance.toLocaleString('vi-VN')}đ.\n\n` +
+      `📲 Vui lòng quét mã VietQR bên dưới để nạp tiền:\n` +
+      `• Ngân hàng: MBBank\n` +
+      `• Số tài khoản: ${accountNo}\n` +
+      `• Chủ TK: ${accountName}\n` +
+      `• Số tiền: ${price.toLocaleString('vi-VN')}đ\n` +
+      `• Nội dung: ${ref}`
+  };
+}
+
 let bot: Telegraf | undefined;
 if (botToken) {
   bot = new Telegraf(botToken);
-  // Set the Telegram bot's public display name on startup (username is managed in @BotFather).
   bot.telegram.setMyName('Shop Hai1110#').catch(err => console.error('Could not set bot display name:', err));
+
   bot.start(async ctx => {
     const url = process.env.MINI_APP_URL || 'https://example.com';
-    await ctx.reply('Chào mừng bạn đến Shop Hai1110#! Mở cửa hàng để xem sản phẩm.', Markup.inlineKeyboard([[Markup.button.webApp('🛍 MỞ CỬA HÀNG', url)]]));
+    const payload = (ctx as any).startPayload;
+
+    // Xử lý khi khách bấm "MUA NGAY" từ GitHub Pages (deep-link ?start=buy_xxx)
+    if (payload && payload.startsWith('buy_')) {
+      const prodId = payload.replace('buy_', '');
+      const res = await processOrderDelivery(String(ctx.from.id), ctx.from.username, ctx.from.first_name, prodId);
+      if (res.needsPayment && res.qrUrl) {
+        return ctx.replyWithPhoto({ url: res.qrUrl }, { caption: res.message });
+      }
+      return ctx.reply(res.message);
+    }
+
+    await ctx.reply(
+      '👋 Chào mừng bạn đến Shop Hai1110#!\n' +
+      'Bấm nút bên dưới để mở cửa hàng và chọn sản phẩm:',
+      Markup.inlineKeyboard([[Markup.button.webApp('🛍 MỞ CỬA HÀNG', url)]])
+    );
   });
+
+  // Nhận dữ liệu đặt hàng khi Mini App gửi qua Telegram.WebApp.sendData
+  bot.on('message', async (ctx, next) => {
+    const rawData = (ctx.message as any)?.web_app_data?.data;
+    if (rawData) {
+      try {
+        const data = JSON.parse(rawData);
+        if (data.action === 'BUY' && data.productId) {
+          const res = await processOrderDelivery(String(ctx.from.id), ctx.from.username, ctx.from.first_name, data.productId);
+          if (res.needsPayment && res.qrUrl) {
+            return ctx.replyWithPhoto({ url: res.qrUrl }, { caption: res.message });
+          }
+          return ctx.reply(res.message);
+        }
+      } catch (e) {
+        console.error('Lỗi nhận dữ liệu web_app_data:', e);
+      }
+      return;
+    }
+    return next();
+  });
+
   bot.command('shop', ctx => ctx.reply('Shop Hai1110# — Mở cửa hàng:', Markup.inlineKeyboard([[Markup.button.webApp('🛍 MỞ MINI APP', process.env.MINI_APP_URL || 'https://example.com')]])));
   bot.command('help', ctx => ctx.reply('/shop - Mở cửa hàng\n/orders - Lịch sử đơn hàng\n/support - Hỗ trợ'));
   bot.command('support', ctx => ctx.reply('Vui lòng liên hệ quản trị viên cửa hàng.'));

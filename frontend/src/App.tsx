@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ShoppingBag, Layers, UserRound, Package, ShieldCheck, Plus, RefreshCw, Settings, CheckCircle2 } from 'lucide-react';
+import { ShoppingBag, Layers, UserRound, Package, ShieldCheck, Plus, RefreshCw, CheckCircle2, Send, Download } from 'lucide-react';
 
 declare global {
   interface Window {
@@ -7,31 +7,20 @@ declare global {
     Telegram?: {
       WebApp?: {
         initData: string;
+        initDataUnsafe?: {
+          user?: {
+            id: number;
+            first_name: string;
+            username?: string;
+          };
+        };
         ready(): void;
         expand(): void;
-        openLink(url: string): void;
+        openTelegramLink(url: string): void;
+        sendData(data: string): void;
       };
     };
   }
-}
-
-// Tự động phân giải URL Backend mà KHÔNG CẦN ?apiUrl= trên link BotFather
-function getInitialApi(): string {
-  if (typeof window === 'undefined') return 'http://localhost:4000';
-  // 1. Lấy từ file config.js (window.__API_URL__)
-  const fromWindow = window.__API_URL__?.trim();
-  if (fromWindow) return fromWindow.replace(/\/+$/, '');
-  // 2. Lấy từ localStorage nếu đã lưu trước đó
-  const fromStorage = localStorage.getItem('apiUrl')?.trim();
-  if (fromStorage) return fromStorage.replace(/\/+$/, '');
-  // 3. Lấy từ biến build Vite nếu có
-  const fromVite = (import.meta as any).env.VITE_API_URL?.trim();
-  if (fromVite) return fromVite.replace(/\/+$/, '');
-  // 4. Nếu đang mở trực tiếp trên localhost máy chủ
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return 'http://localhost:4000';
-  }
-  return '';
 }
 
 const isLocalhost = typeof window !== 'undefined' && (
@@ -39,16 +28,20 @@ const isLocalhost = typeof window !== 'undefined' && (
   window.location.hostname === '127.0.0.1'
 );
 
+function getInitialApi(): string {
+  if (typeof window === 'undefined') return '';
+  // Chỉ dùng API khi đang chạy trên localhost máy chủ
+  if (isLocalhost) return 'http://localhost:4000';
+  return '';
+}
+
 type Product = { id: string; name: string; description?: string; price: number; salePrice?: number; category?: { name: string } };
 
 export default function App() {
-  // Trang quản trị CHỈ được phép mở khi đang chạy trên localhost của máy chủ
   const [adminMode, setAdminMode] = useState(
     isLocalhost && (location.pathname.startsWith('/admin') || location.hash === '#admin')
   );
-  const [apiUrl, setApiUrl] = useState(getInitialApi());
-  const [inputUrl, setInputUrl] = useState('');
-  const [showConfig, setShowConfig] = useState(false);
+  const [apiUrl] = useState(getInitialApi());
   const [token, setToken] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
@@ -61,9 +54,15 @@ export default function App() {
   const [depositAmount, setDepositAmount] = useState('50000');
   const [qr, setQr] = useState('');
   const [profile, setProfile] = useState<any>(null);
+  const [botUsername, setBotUsername] = useState('TaiNguyenGiaReBot');
+  const [bankConfig, setBankConfig] = useState({
+    bankId: '970422',
+    accountNo: '0987654321',
+    accountName: 'NGUYEN VAN A'
+  });
 
   async function api(path: string, options: RequestInit = {}) {
-    if (!apiUrl) throw new Error('Chưa cấu hình địa chỉ Backend API');
+    if (!apiUrl) throw new Error('API không khả dụng');
     const currentToken = token || localStorage.getItem(adminMode ? 'adminToken' : 'userToken');
     const response = await fetch(`${apiUrl}${path}`, {
       ...options,
@@ -78,69 +77,142 @@ export default function App() {
     return data;
   }
 
-  // Tự động đăng nhập
+  // Tự động nhận diện tài khoản Telegram khi mở Mini App
   useEffect(() => {
-    if (!apiUrl) return;
-    let isMounted = true;
-    const autoAuthenticate = async () => {
-      try {
-        if (adminMode) {
-          // Tự động cấp quyền Quản trị viên (KHÔNG CẦN TÀI KHOẢN MẬT KHẨU ADMIN)
-          const res = await fetch(`${apiUrl}/api/admin/session`, { method: 'POST' });
-          const data = await res.json();
-          if (isMounted && data.token) {
-            localStorage.setItem('adminToken', data.token);
-            setToken(data.token);
-            setMessage('Đã kết nối quyền Quản trị viên tự động');
-          }
-        } else {
-          // Tự động đăng nhập người dùng từ Telegram WebApp trên GitHub Pages
-          const tg = window.Telegram?.WebApp;
-          tg?.ready();
-          tg?.expand();
-          const initData = tg?.initData || '';
+    const tg = window.Telegram?.WebApp;
+    tg?.ready();
+    tg?.expand();
 
-          const res = await fetch(`${apiUrl}/api/auth/telegram`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ initData })
-          });
-          const data = await res.json();
-          if (isMounted && data.token) {
-            localStorage.setItem('userToken', data.token);
-            setToken(data.token);
-            setProfile(data.user);
-          }
-        }
-      } catch (e) {
-        console.warn('Lỗi kết nối tự động:', e);
-        if (isMounted) setMessage('Chưa kết nối được Backend: ' + (e as Error).message);
+    if (tg?.initDataUnsafe?.user) {
+      setProfile({
+        telegramId: String(tg.initDataUnsafe.user.id),
+        firstName: tg.initDataUnsafe.user.first_name,
+        username: tg.initDataUnsafe.user.username,
+        balance: 200000
+      });
+    }
+
+    // Nếu chạy local có backend
+    if (apiUrl) {
+      if (adminMode) {
+        fetch(`${apiUrl}/api/admin/session`, { method: 'POST' })
+          .then((r) => r.json())
+          .then((d) => {
+            if (d.token) {
+              localStorage.setItem('adminToken', d.token);
+              setToken(d.token);
+            }
+          })
+          .catch(() => {});
+      } else {
+        const initData = tg?.initData || '';
+        fetch(`${apiUrl}/api/auth/telegram`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ initData })
+        })
+          .then((r) => r.json())
+          .then((d) => {
+            if (d.token) {
+              localStorage.setItem('userToken', d.token);
+              setToken(d.token);
+              setProfile(d.user);
+            }
+          })
+          .catch(() => {});
       }
-    };
-
-    autoAuthenticate();
-    return () => { isMounted = false; };
+    }
   }, [adminMode, apiUrl]);
 
+  // Tải dữ liệu sản phẩm (Hỗ trợ cả Local API lẫn Serverless Static trên GitHub Pages)
   async function loadData() {
-    try {
-      const prods = await api('/api/products');
-      setProducts(prods);
-      const cats = await api('/api/categories');
-      setCategories(cats);
-      if (token && !adminMode) {
-        const me = await api('/api/me');
-        setProfile(me);
+    if (apiUrl) {
+      try {
+        const prods = await api('/api/products');
+        setProducts(prods);
+        const cats = await api('/api/categories');
+        setCategories(cats);
+        if (token && !adminMode) {
+          const me = await api('/api/me');
+          setProfile(me);
+        }
+        return;
+      } catch (err) {
+        console.warn('API local không phản hồi, chuyển sang nạp products.json tĩnh:', err);
       }
-      setMessage('');
+    }
+
+    // Chế độ KHÔNG DÙNG TUNNEL & KHÔNG DÙNG VPS: Tải trực tiếp từ file products.json tĩnh trên GitHub Pages
+    try {
+      const res = await fetch('./products.json');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.products) setProducts(json.products);
+        if (json.categories) setCategories(json.categories);
+        if (json.botUsername) setBotUsername(json.botUsername);
+        if (json.bankConfig) setBankConfig(json.bankConfig);
+      }
     } catch (e) {
-      setMessage((e as Error).message);
+      console.warn('Không thể nạp products.json:', e);
     }
   }
 
   useEffect(() => {
-    if (token) loadData();
-  }, [token, apiUrl]);
+    loadData();
+  }, [apiUrl, token]);
+
+  // Mua hàng (Chạy 100% không cần Tunnel / VPS)
+  async function buy(p: Product) {
+    // Nếu đang chạy local kết nối API trực tiếp:
+    if (apiUrl) {
+      try {
+        const d = await api('/api/orders', {
+          method: 'POST',
+          body: JSON.stringify({ productId: p.id, quantity: 1 })
+        });
+        setMessage(`🎉 Mua thành công: ${d.order.code}\n${d.delivery ? d.delivery.join('\n') : ''}`);
+        await loadData();
+        return;
+      } catch (err) {
+        console.warn('Local purchase error:', err);
+      }
+    }
+
+    // CHẾ ĐỘ GITHUB PAGES KHÔNG DÙNG TUNNEL & KHÔNG DÙNG VPS:
+    // Chuyển đơn hàng trực tiếp sang Bot Telegram qua Telegram WebApp SDK hoặc Deep Link!
+    const tg = window.Telegram?.WebApp;
+    const botName = botUsername || 'TaiNguyenGiaReBot';
+    const deepLink = `https://t.me/${botName}?start=buy_${p.id}`;
+
+    if (tg) {
+      try {
+        tg.sendData(JSON.stringify({ action: 'BUY', productId: p.id, name: p.name }));
+      } catch {}
+
+      if (tg.openTelegramLink) {
+        tg.openTelegramLink(deepLink);
+      } else {
+        window.location.href = deepLink;
+      }
+      return;
+    }
+
+    // Mở ngoài trình duyệt
+    window.open(deepLink, '_blank');
+  }
+
+  // Nạp tiền VietQR (Tự động sinh mã client-side, không cần máy chủ)
+  async function deposit(e: React.FormEvent) {
+    e.preventDefault();
+    const bank = bankConfig.bankId || '970422';
+    const acc = bankConfig.accountNo || '0987654321';
+    const name = bankConfig.accountName || 'SHOP HAI1110';
+    const teleId = profile?.telegramId || window.Telegram?.WebApp?.initDataUnsafe?.user?.id || 'KHACH';
+    const ref = `NAP${teleId}`;
+    const qrUrl = `https://img.vietqr.io/image/${bank}-${acc}-compact2.png?amount=${depositAmount}&addInfo=${ref}&accountName=${encodeURIComponent(name)}`;
+    setQr(qrUrl);
+    setMessage(`Quét mã VietQR trên để nạp tiền (Nội dung chuyển khoản: ${ref})`);
+  }
 
   async function addCategory(e: React.FormEvent) {
     e.preventDefault();
@@ -173,39 +245,14 @@ export default function App() {
     }
   }
 
-  async function buy(id: string) {
+  // Xuất dữ liệu từ SQLite ra GitHub Pages
+  async function exportGithubPage() {
     try {
-      const d = await api('/api/orders', {
-        method: 'POST',
-        body: JSON.stringify({ productId: id, quantity: 1 })
-      });
-      setMessage(`🎉 Mua thành công! Mã đơn: ${d.order.code}\n${d.delivery ? d.delivery.join('\n') : ''}`);
-      await loadData();
+      const res = await api('/api/admin/export-githubpage', { method: 'POST' });
+      setMessage('✅ ' + res.message);
     } catch (e) {
       setMessage((e as Error).message);
     }
-  }
-
-  async function deposit(e: React.FormEvent) {
-    e.preventDefault();
-    try {
-      const d = await api('/api/payments/deposits', {
-        method: 'POST',
-        body: JSON.stringify({ amount: Number(depositAmount) })
-      });
-      setQr(d.qrUrl);
-      setMessage(`Quét mã chuyển đúng ${Number(d.amount).toLocaleString('vi-VN')}đ với nội dung: ${d.reference}`);
-    } catch (e) {
-      setMessage((e as Error).message);
-    }
-  }
-
-  function saveCustomApi(e: React.FormEvent) {
-    e.preventDefault();
-    localStorage.setItem('apiUrl', apiUrl);
-    setShowConfig(false);
-    setToken('');
-    setMessage('Đã lưu địa chỉ Backend mới. Đang kết nối lại...');
   }
 
   return (
@@ -216,93 +263,42 @@ export default function App() {
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           {isLocalhost && (
-            <>
-              <button
-                className="ghost"
-                style={{ padding: '6px 12px', fontSize: '11px', borderRadius: '8px' }}
-                onClick={() => {
-                  const next = !adminMode;
-                  setAdminMode(next);
-                  setToken('');
-                  if (typeof window !== 'undefined') {
-                    window.location.hash = next ? 'admin' : '';
-                  }
-                }}
-              >
-                {adminMode ? '🛍️ VỀ CỬA HÀNG' : '⚡ QUẢN TRỊ (LOCAL)'}
-              </button>
-              <button
-                className="ghost"
-                style={{ padding: '6px 8px', borderRadius: '8px' }}
-                title="Cài đặt API Backend"
-                onClick={() => setShowConfig(!showConfig)}
-              >
-                <Settings size={14} />
-              </button>
-            </>
+            <button
+              className="ghost"
+              style={{ padding: '6px 12px', fontSize: '11px', borderRadius: '8px' }}
+              onClick={() => {
+                const next = !adminMode;
+                setAdminMode(next);
+                setToken('');
+                if (typeof window !== 'undefined') {
+                  window.location.hash = next ? 'admin' : '';
+                }
+              }}
+            >
+              {adminMode ? '🛍️ VỀ CỬA HÀNG' : '⚡ QUẢN TRỊ (LOCAL)'}
+            </button>
           )}
-          <div className="status"><i /> {isLocalhost ? 'LOCAL SERVER' : 'SYSTEM ONLINE'}</div>
+          <div className="status"><i /> {isLocalhost ? 'LOCAL SERVER' : 'TELEGRAM ONLINE'}</div>
         </div>
       </header>
 
-      {showConfig && (
-        <section className="panel" style={{ border: '1px solid #00d9ff' }}>
-          <h2><Settings /> Cấu hình API Backend</h2>
-          <p style={{ margin: '6px 0 12px' }}>
-            Nếu chạy Mini App trên GitHub Pages, nhập URL Tunnel (ví dụ <code>https://xxx.trycloudflare.com</code>) trỏ về máy tính:
-          </p>
-          <form onSubmit={saveCustomApi} style={{ display: 'flex', gap: '8px' }}>
-            <input
-              value={apiUrl}
-              onChange={(e) => setApiUrl(e.target.value)}
-              placeholder="https://xxx.trycloudflare.com hoặc http://localhost:4000"
-            />
-            <button type="submit" style={{ whiteSpace: 'nowrap' }}>LƯU & KẾT NỐI</button>
-          </form>
-        </section>
-      )}
-
-      {!apiUrl && (
-        <section className="panel" style={{ border: '1px solid #00d9ff', textAlign: 'center', margin: '20px 0' }}>
-          <h2>🔗 Kết nối máy chủ</h2>
-          <p style={{ margin: '8px 0 14px', fontSize: '13px' }}>
-            Nhập địa chỉ máy chủ Backend (link Tunnel Cloudflare / Ngrok / VPS) để kết nối:
-          </p>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              const cleaned = inputUrl.trim().replace(/\/+$/, '');
-              if (cleaned) {
-                localStorage.setItem('apiUrl', cleaned);
-                setApiUrl(cleaned);
-              }
-            }}
-            style={{ display: 'flex', gap: '8px', maxWidth: 460, margin: 'auto' }}
-          >
-            <input
-              placeholder="https://abc-xyz.trycloudflare.com"
-              value={inputUrl}
-              onChange={(e) => setInputUrl(e.target.value)}
-              required
-            />
-            <button type="submit" style={{ whiteSpace: 'nowrap' }}>LƯU & KẾT NỐI</button>
-          </form>
-        </section>
-      )}
-
-      {message && <div className="notice">{message}</div>}
+      {message && <div className="notice" style={{ whiteSpace: 'pre-line' }}>{message}</div>}
 
       {adminMode ? (
         <>
           <section className="hero">
             <ShieldCheck size={48} />
             <div>
-              <p className="eyebrow">CHẾ ĐỘ QUẢN TRỊ VIÊN</p>
+              <p className="eyebrow">CHẾ ĐỘ QUẢN TRỊ VIÊN CỤC BỘ</p>
               <h1>ADMIN PANEL</h1>
-              <p>Tự động xác thực • Không cần tài khoản / mật khẩu</p>
+              <p>Chỉ chạy trên Localhost máy chủ • Không cần tài khoản / mật khẩu</p>
             </div>
-            <button className="ghost" onClick={() => { setAdminMode(false); window.location.hash = ''; }}>
-              Xem Shop
+            <button
+              className="ghost"
+              style={{ background: '#00d9ff', color: '#06101b', fontWeight: 'bold', display: 'flex', gap: '6px', alignItems: 'center' }}
+              onClick={exportGithubPage}
+            >
+              <Download size={16} /> Xuất lên GitHub Pages
             </button>
           </section>
 
@@ -368,7 +364,7 @@ export default function App() {
             <div>
               <p className="eyebrow">TELEGRAM COMMERCE · DIGITAL GOODS</p>
               <h1>TÀI NGUYÊN<br /><em>GIÁ RẺ.</em></h1>
-              <p>Tự động nhận diện tài khoản Telegram • Mua hàng nhận key tức thì.</p>
+              <p>Mua hàng tự động qua Telegram • Nhận tài khoản/key ngay lập tức.</p>
             </div>
             <ShoppingBag size={58} />
           </section>
@@ -376,8 +372,8 @@ export default function App() {
           <section className="wallet">
             <div>
               <small><UserRound size={14} /> TÀI KHOẢN TELEGRAM</small>
-              <strong>{profile?.firstName || profile?.username || 'Khách Hàng'}</strong>
-              <small>Số dư khả dụng: <b style={{ color: '#00e6a8', fontSize: '13px' }}>{Number(profile?.balance || 0).toLocaleString('vi-VN')}đ</b></small>
+              <strong>{profile?.firstName || profile?.username || 'Khách Hàng Telegram'}</strong>
+              <small>Nạp tiền tự động qua VietQR bên cạnh</small>
             </div>
             <form onSubmit={deposit}>
               <input
@@ -395,7 +391,22 @@ export default function App() {
             <section className="panel qr">
               <h2>Mã QR Nạp Tiền VietQR</h2>
               <img src={qr} alt="VietQR" />
-              <p style={{ marginTop: '8px' }}>Chuyển khoản theo mã QR trên để hệ thống tự động cộng số dư.</p>
+              <p style={{ marginTop: '8px' }}>Quét mã chuyển khoản theo đúng nội dung để hệ thống tự động xử lý.</p>
+              <button
+                className="ghost"
+                style={{ marginTop: '10px', display: 'inline-flex', gap: '6px', alignItems: 'center' }}
+                onClick={() => {
+                  const botName = botUsername || 'TaiNguyenGiaReBot';
+                  const link = `https://t.me/${botName}?start=nap_${depositAmount}`;
+                  if (window.Telegram?.WebApp?.openTelegramLink) {
+                    window.Telegram.WebApp.openTelegramLink(link);
+                  } else {
+                    window.open(link, '_blank');
+                  }
+                }}
+              >
+                <Send size={14} /> Báo đã chuyển khoản cho Bot
+              </button>
             </section>
           )}
 
@@ -420,7 +431,7 @@ export default function App() {
                 <h3>{p.name}</h3>
                 <p>{p.description || 'Sản phẩm kỹ thuật số chính hãng'}</p>
                 <strong>{Number(p.salePrice || p.price).toLocaleString('vi-VN')}đ</strong>
-                <button onClick={() => buy(p.id)}>MUA NGAY</button>
+                <button onClick={() => buy(p)}>MUA NGAY</button>
               </article>
             ))}
           </div>

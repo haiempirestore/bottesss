@@ -1,0 +1,41 @@
+{
+  "botUsername": "TaiNguyenGiaReBot",
+  "bankConfig": {
+    "bankId": "970422",
+    "accountNo": "0987654321",
+    "accountName": "NGUYEN VAN A"
+  },
+  "categories": [
+    { "id": "cat_1", "name": "Tài khoản Premium", "slug": "tai-khoan-premium" },
+    { "id": "cat_2", "name": "Phần mềm & Bản quyền", "slug": "phan-mem-ban-quyen" }
+  ],
+  "products": [
+    {
+      "id": "prod_1",
+      "categoryId": "cat_1",
+      "name": "Netflix Premium 4K UHD (1 Tháng)",
+      "description": "Xem 4K HDR, profile riêng biệt, bảo hành trọn thời gian",
+      "price": 65000,
+      "salePrice": 59000,
+      "category": { "name": "Tài khoản Premium" }
+    },
+    {
+      "id": "prod_2",
+      "categoryId": "cat_1",
+      "name": "Spotify Premium 1 Năm",
+      "description": "Nghe nhạc lossless, tải offline, không quảng cáo",
+      "price": 180000,
+      "salePrice": 150000,
+      "category": { "name": "Tài khoản Premium" }
+    },
+    {
+      "id": "prod_3",
+      "categoryId": "cat_2",
+      "name": "Key Windows 11 Pro Retail",
+      "description": "Kích hoạt vĩnh viễn theo mainboard, update thoải mái",
+      "price": 120000,
+      "salePrice": 99000,
+      "category": { "name": "Phần mềm & Bản quyền" }
+    }
+  ]
+}
