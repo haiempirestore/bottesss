@@ -653,36 +653,36 @@ async function generateVietQrBuffer(bank: string, accountNo: string, accountName
   try {
     const emvco = buildVietQrEmvco(bank, accountNo, amount, ref);
 
-    // Tạo mã QR chuẩn NAPAS kích thước 224x224
+    // Tạo mã QR chuẩn NAPAS kích thước 380x380
     const qrPng = await QRCode.toBuffer(emvco, {
       type: 'png',
       margin: 1,
-      width: 224,
+      width: 380,
       errorCorrectionLevel: 'M',
       color: { dark: '#0c1829', light: '#ffffff' }
     });
 
-    const templatePath = path.resolve(__dirname, '../assets/bunny_vietqr_template.png');
+    const templatePath = path.resolve(__dirname, '../assets/hai1110_qr_template.png');
     if (fs.existsSync(templatePath)) {
       const formattedAmount = `${amount.toLocaleString('vi-VN')}đ`;
       const svgText = Buffer.from(`
-        <svg width="894" height="908">
+        <svg width="1024" height="1024">
           <style>
             .amount {
               font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-              font-size: 33px;
+              font-size: 50px;
               font-weight: 900;
               fill: #0c1829;
               letter-spacing: -0.5px;
             }
           </style>
-          <text x="622" y="863" text-anchor="middle" dominant-baseline="central" class="amount">${formattedAmount}</text>
+          <text x="676" y="912" text-anchor="middle" dominant-baseline="central" class="amount">${formattedAmount}</text>
         </svg>
       `);
 
       return await sharp(templatePath)
         .composite([
-          { input: qrPng, left: 512, top: 386 },
+          { input: qrPng, left: 486, top: 323 },
           { input: svgText, left: 0, top: 0 }
         ])
         .jpeg({ quality: 95 })

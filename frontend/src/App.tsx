@@ -1324,9 +1324,9 @@ export default function App() {
               ))}
             </div>
 
-            {/* Khung mã QR Chuyển khoản Thỏ Siêu thị MMO chuẩn mẫu */}
+            {/* Khung mã QR Chuyển khoản Cute Độc quyền Shop Hai1110# */}
             <div className="bunny-qr-container">
-              <img src="./bunny_vietqr_template.png" alt="Khung QR Chuyển khoản" className="bunny-qr-template" />
+              <img src="./hai1110_qr_template.png" alt="Khung QR Chuyển khoản" className="bunny-qr-template" />
               <img
                 src={`https://img.vietqr.io/image/970436-HAI100TR-qr_only.png?amount=${depositAmount}&addInfo=NAP${profile?.telegramId || '6632274262'}&accountName=NGUYEN%20HOANG%20HAI`}
                 alt="Mã QR Vietcombank"

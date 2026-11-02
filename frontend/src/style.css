@@ -1145,7 +1145,7 @@ body {
   to { transform: translate(-50%, 0); opacity: 1; }
 }
 
-/* Deposit QR Box — Khung Thỏ Siêu thị MMO chuẩn mẫu người dùng */
+/* Deposit QR Box — Khung Chuyển Khoản Cute Độc Quyền Shop Hai1110# */
 .bunny-qr-container {
   position: relative;
   width: 100%;
@@ -1155,30 +1155,33 @@ body {
   overflow: hidden;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), 0 0 20px rgba(44, 93, 133, 0.25);
   background: #09121d;
+  aspect-ratio: 1 / 1;
 }
 
 .bunny-qr-template {
   width: 100%;
-  height: auto;
+  height: 100%;
+  object-fit: cover;
   display: block;
 }
 
 .bunny-qr-code-overlay {
   position: absolute;
-  left: 57.27%;
-  top: 42.51%;
-  width: 25.05%;
-  height: 24.67%;
+  left: 47.46%;
+  top: 31.54%;
+  width: 37.11%;
+  height: 37.11%;
   object-fit: contain;
   background: #ffffff;
+  border-radius: 6px;
 }
 
 .bunny-qr-amount-overlay {
   position: absolute;
-  left: 69.57%;
-  top: 95.04%;
+  left: 66.02%;
+  top: 89.06%;
   transform: translate(-50%, -50%);
-  font-size: clamp(11px, 3.8vw, 13px);
+  font-size: clamp(12px, 4vw, 15px);
   font-weight: 900;
   color: #0c1829;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
