@@ -3,6 +3,7 @@ import { ShoppingBag, Layers, UserRound, Package, ShieldCheck, Plus, RefreshCw, 
 
 declare global {
   interface Window {
+    __API_URL__?: string;
     Telegram?: {
       WebApp?: {
         initData: string;
@@ -14,13 +15,24 @@ declare global {
   }
 }
 
-// Lấy apiUrl từ query parameter (?apiUrl=...) hoặc localStorage hoặc biến môi trường Vite
-const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-const queryApi = searchParams?.get('apiUrl');
-if (queryApi && typeof window !== 'undefined') {
-  localStorage.setItem('apiUrl', queryApi);
+// Tự động phân giải URL Backend mà KHÔNG CẦN ?apiUrl= trên link BotFather
+function getInitialApi(): string {
+  if (typeof window === 'undefined') return 'http://localhost:4000';
+  // 1. Lấy từ file config.js (window.__API_URL__)
+  const fromWindow = window.__API_URL__?.trim();
+  if (fromWindow) return fromWindow.replace(/\/+$/, '');
+  // 2. Lấy từ localStorage nếu đã lưu trước đó
+  const fromStorage = localStorage.getItem('apiUrl')?.trim();
+  if (fromStorage) return fromStorage.replace(/\/+$/, '');
+  // 3. Lấy từ biến build Vite nếu có
+  const fromVite = (import.meta as any).env.VITE_API_URL?.trim();
+  if (fromVite) return fromVite.replace(/\/+$/, '');
+  // 4. Nếu đang mở trực tiếp trên localhost máy chủ
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:4000';
+  }
+  return '';
 }
-const initialApi = ((typeof window !== 'undefined' && localStorage.getItem('apiUrl')) || (import.meta as any).env.VITE_API_URL || 'http://localhost:4000').replace(/\/+$/, '');
 
 const isLocalhost = typeof window !== 'undefined' && (
   window.location.hostname === 'localhost' ||
@@ -34,7 +46,8 @@ export default function App() {
   const [adminMode, setAdminMode] = useState(
     isLocalhost && (location.pathname.startsWith('/admin') || location.hash === '#admin')
   );
-  const [apiUrl, setApiUrl] = useState(initialApi);
+  const [apiUrl, setApiUrl] = useState(getInitialApi());
+  const [inputUrl, setInputUrl] = useState('');
   const [showConfig, setShowConfig] = useState(false);
   const [token, setToken] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
@@ -50,6 +63,7 @@ export default function App() {
   const [profile, setProfile] = useState<any>(null);
 
   async function api(path: string, options: RequestInit = {}) {
+    if (!apiUrl) throw new Error('Chưa cấu hình địa chỉ Backend API');
     const currentToken = token || localStorage.getItem(adminMode ? 'adminToken' : 'userToken');
     const response = await fetch(`${apiUrl}${path}`, {
       ...options,
@@ -66,6 +80,7 @@ export default function App() {
 
   // Tự động đăng nhập
   useEffect(() => {
+    if (!apiUrl) return;
     let isMounted = true;
     const autoAuthenticate = async () => {
       try {
@@ -241,6 +256,34 @@ export default function App() {
               value={apiUrl}
               onChange={(e) => setApiUrl(e.target.value)}
               placeholder="https://xxx.trycloudflare.com hoặc http://localhost:4000"
+            />
+            <button type="submit" style={{ whiteSpace: 'nowrap' }}>LƯU & KẾT NỐI</button>
+          </form>
+        </section>
+      )}
+
+      {!apiUrl && (
+        <section className="panel" style={{ border: '1px solid #00d9ff', textAlign: 'center', margin: '20px 0' }}>
+          <h2>🔗 Kết nối máy chủ</h2>
+          <p style={{ margin: '8px 0 14px', fontSize: '13px' }}>
+            Nhập địa chỉ máy chủ Backend (link Tunnel Cloudflare / Ngrok / VPS) để kết nối:
+          </p>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const cleaned = inputUrl.trim().replace(/\/+$/, '');
+              if (cleaned) {
+                localStorage.setItem('apiUrl', cleaned);
+                setApiUrl(cleaned);
+              }
+            }}
+            style={{ display: 'flex', gap: '8px', maxWidth: 460, margin: 'auto' }}
+          >
+            <input
+              placeholder="https://abc-xyz.trycloudflare.com"
+              value={inputUrl}
+              onChange={(e) => setInputUrl(e.target.value)}
+              required
             />
             <button type="submit" style={{ whiteSpace: 'nowrap' }}>LƯU & KẾT NỐI</button>
           </form>
