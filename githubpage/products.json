@@ -1,9 +1,9 @@
 {
-  "botUsername": "TaiNguyenGiaReBot",
+  "botUsername": "tainguyenhai1110_bot",
   "bankConfig": {
     "bankId": "970422",
-    "accountNo": "0987654321",
-    "accountName": "NGUYEN VAN A"
+    "accountNo": "HAI100TR",
+    "accountName": "NGUYEN HOANG HAI"
   },
   "categories": [
     { "id": "cat_1", "name": "Tài khoản Premium", "slug": "tai-khoan-premium" },

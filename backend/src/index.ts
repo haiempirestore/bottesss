@@ -392,8 +392,53 @@ if (botToken) {
   bot = new Telegraf(botToken);
   bot.telegram.setMyName('Shop Hai1110#').catch(err => console.error('Could not set bot display name:', err));
 
+  const miniAppUrl = (process.env.MINI_APP_URL || 'https://haiempirestore.github.io/bottesss/').trim();
+
+  // 1. Tự động thiết lập Menu Button góc trái dưới của Telegram
+  if (miniAppUrl.startsWith('https://')) {
+    bot.telegram.setChatMenuButton({
+      menuButton: {
+        type: 'web_app',
+        text: '🛍 MỞ CỬA HÀNG',
+        web_app: { url: miniAppUrl }
+      }
+    }).then(() => console.log('✅ Đã cấu hình Menu Button góc trái Telegram:', miniAppUrl))
+      .catch(err => console.error('Lỗi setChatMenuButton:', err));
+  }
+
+  // 2. Cấu hình danh sách lệnh cho thanh Menu Telegram
+  bot.telegram.setMyCommands([
+    { command: 'start', description: 'Mở cửa hàng & xem sản phẩm' },
+    { command: 'menu', description: 'Bật menu phím bấm Mini App' },
+    { command: 'shop', description: 'Mở cửa hàng Mini App' },
+    { command: 'orders', description: 'Lịch sử mua hàng & nhận key' },
+    { command: 'help', description: 'Hướng dẫn mua sắm' },
+    { command: 'support', description: 'Hỗ trợ khách hàng' }
+  ]).then(() => console.log('✅ Đã cấu hình danh sách lệnh Bot (/start, /menu, /shop...)'))
+    .catch(err => console.error('Lỗi setMyCommands:', err));
+
+  // Hàm tạo bàn phím menu mở Mini App chuẩn
+  function createMenuKeyboards(url: string) {
+    if (url.startsWith('https://')) {
+      return {
+        inline: Markup.inlineKeyboard([
+          [Markup.button.webApp('🛍 MỞ CỬA HÀNG', url)]
+        ]),
+        reply: Markup.keyboard([
+          [Markup.button.webApp('🛍 MỞ CỬA HÀNG TRỰC TIẾP', url)],
+          ['📦 Lịch sử đơn hàng', '💬 Hỗ trợ']
+        ]).resize()
+      };
+    }
+    return {
+      inline: Markup.inlineKeyboard([
+        [Markup.button.url('🛍 Mở trang Web', url || 'https://haiempirestore.github.io/bottesss/')]
+      ]),
+      reply: Markup.keyboard([['🛍 Mở Cửa Hàng', '💬 Hỗ trợ']]).resize()
+    };
+  }
+
   bot.start(async ctx => {
-    const url = process.env.MINI_APP_URL || 'https://example.com';
     const payload = (ctx as any).startPayload;
 
     // Xử lý khi khách bấm "MUA NGAY" từ GitHub Pages (deep-link ?start=buy_xxx)
@@ -406,11 +451,123 @@ if (botToken) {
       return ctx.reply(res.message);
     }
 
+    // Xử lý nạp tiền deep-link ?start=nap_xxx
+    if (payload && payload.startsWith('nap_')) {
+      const amount = Number(payload.replace('nap_', '')) || 50000;
+      const bank = process.env.VIETQR_BANK_ID || '970422';
+      const acc = process.env.VIETQR_ACCOUNT_NO || process.env.VIETQR_ACCOUNT_NUMBER || 'HAI100TR';
+      const name = process.env.VIETQR_ACCOUNT_NAME || 'NGUYEN HOANG HAI';
+      const ref = `NAP${ctx.from.id}`;
+      const qrUrl = `https://img.vietqr.io/image/${bank}-${acc}-compact2.png?amount=${amount}&addInfo=${ref}&accountName=${encodeURIComponent(name)}`;
+      return ctx.replyWithPhoto(
+        { url: qrUrl },
+        {
+          caption:
+            `📲 THÔNG TIN CHUYỂN KHOẢN VIETQR:\n` +
+            `• Ngân hàng: MBBank\n` +
+            `• Số tài khoản: ${acc}\n` +
+            `• Chủ tài khoản: ${name}\n` +
+            `• Số tiền: ${amount.toLocaleString('vi-VN')}đ\n` +
+            `• Nội dung CK: ${ref}\n\n` +
+            `Hệ thống sẽ tự động cập nhật số dư sau khi nhận chuyển khoản!`
+        }
+      );
+    }
+
+    const kb = createMenuKeyboards(miniAppUrl);
     await ctx.reply(
-      '👋 Chào mừng bạn đến Shop Hai1110#!\n' +
-      'Bấm nút bên dưới để mở cửa hàng và chọn sản phẩm:',
-      Markup.inlineKeyboard([[Markup.button.webApp('🛍 MỞ CỬA HÀNG', url)]])
+      `👋 Xin chào ${ctx.from.first_name || 'bạn'}!\n` +
+      `Chào mừng bạn đến với Shop Hai1110# — Hệ thống phân phối tài khoản & key bản quyền tự động.\n\n` +
+      `👇 Bấm vào nút bên dưới để mở Mini App và chọn sản phẩm:`,
+      kb.inline
     );
+    // Gửi thêm bàn phím ghim ở chân màn hình
+    await ctx.reply('Hoặc chọn menu nhanh:', kb.reply);
+  });
+
+  // Lệnh /menu và /shop
+  bot.command(['menu', 'shop'], async ctx => {
+    const kb = createMenuKeyboards(miniAppUrl);
+    await ctx.reply('🛍 Mời bạn mở cửa hàng Mini App:', kb.inline);
+  });
+
+  // Lệnh /orders - Xem lịch sử đơn hàng
+  bot.command('orders', async ctx => {
+    const user = await prisma.user.findUnique({
+      where: { telegramId: String(ctx.from.id) },
+      include: {
+        orders: {
+          include: { items: { include: { product: true } } },
+          orderBy: { createdAt: 'desc' },
+          take: 5
+        }
+      }
+    });
+
+    if (!user || user.orders.length === 0) {
+      return ctx.reply('📦 Bạn chưa có đơn hàng nào. Hãy bấm /shop để xem các sản phẩm đang bán nhé!');
+    }
+
+    let text = `📦 LỊCH SỬ ĐƠN HÀNG CỦA BẠN (5 đơn gần nhất):\n━━━━━━━━━━━━━━━━━━━━\n`;
+    for (const o of user.orders) {
+      text += `Mã đơn: ${o.code} | Tổng: ${Number(o.total).toLocaleString('vi-VN')}đ\n`;
+      for (const item of o.items) {
+        text += `• ${item.product.name} (SL: ${item.quantity})\n`;
+        if (item.delivered) {
+          text += `  🔑 Key: ${item.delivered}\n`;
+        }
+      }
+      text += `━━━━━━━━━━━━━━━━━━━━\n`;
+    }
+    await ctx.reply(text);
+  });
+
+  bot.hears(['📦 Lịch sử đơn hàng', '📦 Lịch sử đơn'], async ctx => {
+    // Gọi lại logic orders
+    const user = await prisma.user.findUnique({
+      where: { telegramId: String(ctx.from.id) },
+      include: {
+        orders: {
+          include: { items: { include: { product: true } } },
+          orderBy: { createdAt: 'desc' },
+          take: 5
+        }
+      }
+    });
+    if (!user || user.orders.length === 0) {
+      return ctx.reply('📦 Bạn chưa có đơn hàng nào. Hãy bấm /shop để xem các sản phẩm nhé!');
+    }
+    let text = `📦 ĐƠN HÀNG GẦN NHẤT:\n`;
+    for (const o of user.orders) {
+      text += `\nĐơn: ${o.code} (${Number(o.total).toLocaleString('vi-VN')}đ)\n`;
+      for (const item of o.items) {
+        text += `• ${item.product.name}: ${item.delivered || 'Đang giao'}\n`;
+      }
+    }
+    await ctx.reply(text);
+  });
+
+  bot.hears(['menu', 'Menu', 'shop', 'Shop', 'cửa hàng', 'Cửa hàng'], async ctx => {
+    const kb = createMenuKeyboards(miniAppUrl);
+    await ctx.reply('🛍 Bấm nút để mở Mini App:', kb.inline);
+  });
+
+  bot.command('help', ctx => {
+    ctx.reply(
+      `📖 HƯỚNG DẪN MUA SẮM:\n` +
+      `1. Bấm nút "🛍 MỞ CỬA HÀNG" ở góc dưới hoặc gõ /shop\n` +
+      `2. Chọn sản phẩm bạn muốn mua và bấm "MUA NGAY"\n` +
+      `3. Nếu chưa đủ số dư, quét mã VietQR để nạp tiền tự động\n` +
+      `4. Sau khi thanh toán thành công, hệ thống sẽ gửi tài khoản / key trực tiếp vào tin nhắn này!\n\n` +
+      `Cần hỗ trợ? Gõ /support để liên hệ Admin.`
+    );
+  });
+
+  bot.command(['support', 'hotro'], ctx => {
+    ctx.reply('💬 HỖ TRỢ KHÁCH HÀNG:\nVui lòng liên hệ Admin qua Telegram: @haiempire hoặc gọi hotline để được giải đáp 24/7.');
+  });
+  bot.hears('💬 Hỗ trợ', ctx => {
+    ctx.reply('💬 HỖ TRỢ KHÁCH HÀNG:\nVui lòng liên hệ Admin qua Telegram: @haiempire để được giải đáp 24/7.');
   });
 
   // Nhận dữ liệu đặt hàng khi Mini App gửi qua Telegram.WebApp.sendData
@@ -434,10 +591,11 @@ if (botToken) {
     return next();
   });
 
-  bot.command('shop', ctx => ctx.reply('Shop Hai1110# — Mở cửa hàng:', Markup.inlineKeyboard([[Markup.button.webApp('🛍 MỞ MINI APP', process.env.MINI_APP_URL || 'https://example.com')]])));
-  bot.command('help', ctx => ctx.reply('/shop - Mở cửa hàng\n/orders - Lịch sử đơn hàng\n/support - Hỗ trợ'));
-  bot.command('support', ctx => ctx.reply('Vui lòng liên hệ quản trị viên cửa hàng.'));
-  if ((process.env.BOT_MODE || 'polling') === 'polling') bot.launch().catch(err => console.error('Bot launch failed', err));
+  if ((process.env.BOT_MODE || 'polling') === 'polling') {
+    bot.launch().then(() => {
+      console.log('🤖 Telegram Bot đã khởi chạy thành công (Polling mode)!');
+    }).catch(err => console.error('Bot launch failed', err));
+  }
 }
 async function seedDefaultData() {
   const catCount = await prisma.category.count();
