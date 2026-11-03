@@ -1729,7 +1729,7 @@ if (botToken) {
       const hasStock = availableCount > 0;
       return {
         text: `${hasStock ? '🟢' : '🔴'} ${cat.name} (${availableCount})`,
-        callback_data: `cat_slug:${cat.slug}`,
+        callback_data: hasStock ? `cat_slug:${cat.slug}` : `outofstock:${cat.slug}`,
         style: hasStock ? 'success' : 'danger'
       };
     });
@@ -1755,12 +1755,12 @@ if (botToken) {
 
     if (photoInput) {
       const m = await ctx.replyWithPhoto(photoInput, {
-        caption: '🧑‍💼 <b>DANH MỤC SẢN PHẨM</b>\n<i>Chọn danh mục bạn muốn mua (🟢 Còn hàng / 🔴 Hết hàng):</i>',
+        caption: '🧑‍💼 <b>DANH MỤC SẢN PHẨM</b>',
         parse_mode: 'HTML',
         reply_markup: { inline_keyboard: keyboard }
       }).catch(async (err: any) => {
         console.error('Lỗi replyWithPhoto, chuyển fallback gửi text:', err?.message || err);
-        return ctx.reply('🧑‍💼 <b>DANH MỤC SẢN PHẨM</b>\n<i>Chọn danh mục bạn muốn mua (🟢 Còn hàng / 🔴 Hết hàng):</i>', {
+        return ctx.reply('🧑‍💼 <b>DANH MỤC SẢN PHẨM</b>', {
           parse_mode: 'HTML',
           reply_markup: { inline_keyboard: keyboard }
         });
@@ -1769,7 +1769,7 @@ if (botToken) {
         cachedBannerFileId = m.photo[m.photo.length - 1].file_id;
       }
     } else {
-      await ctx.reply('🧑‍💼 <b>DANH MỤC SẢN PHẨM</b>\n<i>Chọn danh mục bạn muốn mua (🟢 Còn hàng / 🔴 Hết hàng):</i>', {
+      await ctx.reply('🧑‍💼 <b>DANH MỤC SẢN PHẨM</b>', {
         parse_mode: 'HTML',
         reply_markup: { inline_keyboard: keyboard }
       });
