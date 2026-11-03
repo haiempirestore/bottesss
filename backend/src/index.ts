@@ -1739,10 +1739,7 @@ if (botToken) {
       keyboard.push(catButtons.slice(i, i + 2));
     }
 
-    // Các nút tiện ích: Mở Mini App, Trở về Menu chính, Gửi yêu cầu
-    keyboard.push([
-      { text: '🛍️ Mở Mini App Mua Hàng', web_app: { url: miniAppUrl } }
-    ]);
+    // Các nút tiện ích: Trở về Menu chính, Gửi yêu cầu
     keyboard.push([
       { text: '⬅️ Trở về', callback_data: 'back_to_main', style: 'primary' },
       { text: '🚨 Gửi yêu cầu', callback_data: 'send_request', style: 'primary' }
