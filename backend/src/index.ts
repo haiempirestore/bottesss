@@ -190,11 +190,35 @@ app.all(['/api/admin/login', '/api/admin/session'], async (req, res) => {
 });
 
 app.get('/api/products', async (_req, res) => {
-  const products = await prisma.product.findMany({ where: { isActive: true, category: { isActive: true } }, include: { category: true }, orderBy: { createdAt: 'desc' } });
+  const rawProducts = await prisma.product.findMany({
+    where: { isActive: true },
+    include: {
+      category: true,
+      stockItems: {
+        where: { status: 'AVAILABLE' },
+        select: { id: true, payload: true }
+      }
+    },
+    orderBy: { createdAt: 'desc' }
+  });
+  const products = rawProducts.map(p => ({
+    id: p.id,
+    name: p.name,
+    description: p.description,
+    price: p.price,
+    salePrice: p.salePrice,
+    imageUrl: p.imageUrl,
+    category: p.category,
+    stockCount: p.stockItems.length,
+    stockItems: p.stockItems.map(s => s.payload)
+  }));
   res.json(products);
 });
 app.get('/api/categories', async (_req, res) => {
   res.json(await prisma.category.findMany({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } }));
+});
+app.get('/api/admin/categories', adminAuth, async (_req, res) => {
+  res.json(await prisma.category.findMany({ orderBy: { sortOrder: 'asc' } }));
 });
 app.get('/api/me', userAuth, async (req, res) => {
   const user = await prisma.user.findUnique({ where: { id: (req as any).auth.id }, select: { id: true, telegramId: true, username: true, firstName: true, balance: true, createdAt: true } });
@@ -747,6 +771,7 @@ async function exportGithubProducts() {
     };
     const fs = await import('node:fs/promises');
     await fs.writeFile(path.resolve(__dirname, '../../frontend/public/products.json'), JSON.stringify(data, null, 2)).catch(() => {});
+    await fs.writeFile(path.resolve(__dirname, '../../frontend/dist/products.json'), JSON.stringify(data, null, 2)).catch(() => {});
     await fs.writeFile(path.resolve(__dirname, '../../githubpage/products.json'), JSON.stringify(data, null, 2)).catch(() => {});
     return true;
   } catch (err) {
@@ -891,6 +916,7 @@ app.post('/api/admin/products/:id/stock', adminAuth, async (req, res) => {
     const result = await prisma.stockItem.createMany({
       data: list.map(payload => ({ productId: id, payload }))
     });
+    await exportGithubProducts();
     res.json({ imported: result.count });
   } catch (err: any) {
     res.status(400).json({ error: err.message || 'Lỗi nhập kho sản phẩm' });
@@ -1682,9 +1708,10 @@ if (botToken) {
     }
   }
 
-  // Danh mục sản phẩm (Hiện ảnh banner Hai1110# Shop, nút màu Xanh khi còn hàng, màu Đỏ khi hết hàng)
+  // Danh mục sản phẩm (Đồng bộ thời gian thực 100% từ Web Admin & SQLite Database)
   async function sendMlOderCategories(ctx: any) {
     const allCategories = await prisma.category.findMany({
+      where: { isActive: true },
       include: {
         products: {
           where: { isActive: true },
@@ -1692,47 +1719,37 @@ if (botToken) {
             stockItems: { where: { status: 'AVAILABLE' } }
           }
         }
-      }
+      },
+      orderBy: { sortOrder: 'asc' }
     });
 
-    // Lấy thông tin nút danh mục: Còn hàng -> Xanh (success) & mở sp; Hết hàng -> Đỏ (danger) & callback hết hàng
-    const getCatBtn = (slug: string, label: string) => {
-      const cat = allCategories.find(c => c.slug === slug);
-      const availableCount = cat ? cat.products.reduce((acc, p) => acc + p.stockItems.length, 0) : 0;
+    const storeSettings = loadStoreSettings();
+    const miniAppUrl = storeSettings.webAppUrl || 'https://haiempirestore.github.io/bottesss/';
+
+    const keyboard: any[] = [];
+    const catButtons = allCategories.map(cat => {
+      const availableCount = cat.products.reduce((acc, p) => acc + p.stockItems.length, 0);
       const hasStock = availableCount > 0;
       return {
-        text: label,
-        callback_data: hasStock ? `cat_slug:${slug}` : `outofstock:${slug}`,
+        text: `${hasStock ? '🟢' : '🔴'} ${cat.name} (${availableCount})`,
+        callback_data: `cat_slug:${cat.slug}`,
         style: hasStock ? 'success' : 'danger'
       };
-    };
+    });
 
-    const keyboard: any[] = [
-      [
-        getCatBtn('microsoft', '🟩 Microsoft'),
-        getCatBtn('google', '✨ Google')
-      ],
-      [
-        getCatBtn('canva', '🎨 Canva'),
-        getCatBtn('chatgpt', '🤖 ChatGPT')
-      ],
-      [
-        getCatBtn('capcut', '✂️ Capcut'),
-        getCatBtn('tools', '⚙️ Tools')
-      ],
-      [
-        getCatBtn('duolingo', '🦉 Duolingo'),
-        getCatBtn('expressvpn', '🛡️ ExpressVPN')
-      ],
-      [
-        getCatBtn('source-code', '📦 Source Code'),
-        getCatBtn('dich-vu-khac', '⭐ Dịch vụ khác')
-      ],
-      [
-        { text: '⬅️ Trở về', callback_data: 'back_to_main', style: 'primary' },
-        { text: '🚨 Gửi yêu cầu', callback_data: 'send_request', style: 'primary' }
-      ]
-    ];
+    // Gom mỗi hàng 2 nút danh mục
+    for (let i = 0; i < catButtons.length; i += 2) {
+      keyboard.push(catButtons.slice(i, i + 2));
+    }
+
+    // Các nút tiện ích: Mở Mini App, Trở về Menu chính, Gửi yêu cầu
+    keyboard.push([
+      { text: '🛍️ Mở Mini App Mua Hàng', web_app: { url: miniAppUrl } }
+    ]);
+    keyboard.push([
+      { text: '⬅️ Trở về', callback_data: 'back_to_main', style: 'primary' },
+      { text: '🚨 Gửi yêu cầu', callback_data: 'send_request', style: 'primary' }
+    ]);
 
     const bannerPath = path.resolve(__dirname, '../assets/banner_hai1110.jpg');
 
@@ -1744,12 +1761,12 @@ if (botToken) {
 
     if (photoInput) {
       const m = await ctx.replyWithPhoto(photoInput, {
-        caption: '🧑‍💼 <b>DANH MỤC SẢN PHẨM</b>',
+        caption: '🧑‍💼 <b>DANH MỤC SẢN PHẨM</b>\n<i>Chọn danh mục bạn muốn mua (🟢 Còn hàng / 🔴 Hết hàng):</i>',
         parse_mode: 'HTML',
         reply_markup: { inline_keyboard: keyboard }
       }).catch(async (err: any) => {
         console.error('Lỗi replyWithPhoto, chuyển fallback gửi text:', err?.message || err);
-        return ctx.reply('🧑‍💼 <b>DANH MỤC SẢN PHẨM</b>', {
+        return ctx.reply('🧑‍💼 <b>DANH MỤC SẢN PHẨM</b>\n<i>Chọn danh mục bạn muốn mua (🟢 Còn hàng / 🔴 Hết hàng):</i>', {
           parse_mode: 'HTML',
           reply_markup: { inline_keyboard: keyboard }
         });
@@ -1758,7 +1775,7 @@ if (botToken) {
         cachedBannerFileId = m.photo[m.photo.length - 1].file_id;
       }
     } else {
-      await ctx.reply('🧑‍💼 <b>DANH MỤC SẢN PHẨM</b>', {
+      await ctx.reply('🧑‍💼 <b>DANH MỤC SẢN PHẨM</b>\n<i>Chọn danh mục bạn muốn mua (🟢 Còn hàng / 🔴 Hết hàng):</i>', {
         parse_mode: 'HTML',
         reply_markup: { inline_keyboard: keyboard }
       });
@@ -1829,13 +1846,15 @@ if (botToken) {
     });
 
     if (!category) return ctx.reply('❌ Không tìm thấy danh mục này.');
+    const categoryName = category.name;
+    const products = category.products;
 
-    if (category.products.length === 0) {
+    if (products.length === 0) {
       const backBtn: any[] = [
         [{ text: '⬅️ Trở về danh mục', callback_data: 'menu_buy', style: 'primary' }],
         [{ text: '🚨 Gửi yêu cầu đặt hàng', callback_data: 'send_request', style: 'success' }]
       ];
-      const emptyText = `📂 <b>Danh mục:</b> ${category.name}\nHiện tại sản phẩm đang được cập nhật thêm. Bạn có thể bấm "🚨 Gửi yêu cầu" để đặt hàng riêng!`;
+      const emptyText = `📂 <b>Danh mục:</b> ${categoryName}\nHiện tại sản phẩm đang được cập nhật thêm. Bạn có thể bấm "🚨 Gửi yêu cầu" để đặt hàng riêng!`;
       if (ctx.callbackQuery) {
         return ctx.editMessageText(emptyText, { parse_mode: 'HTML', reply_markup: { inline_keyboard: backBtn } });
       }
@@ -1843,12 +1862,12 @@ if (botToken) {
     }
 
     let text =
-      `📂 <b>DANH MỤC: ${category.name.toUpperCase()}</b>\n` +
+      `📂 <b>DANH MỤC: ${categoryName.toUpperCase()}</b>\n` +
       `━━━━━━━━━━━━━━━━━━━━\n` +
       `Chọn sản phẩm bạn muốn mua ngay bên dưới:\n\n`;
 
     const buttons: any[] = [];
-    for (const p of category.products) {
+    for (const p of products) {
       const price = p.salePrice ?? p.price;
       const stockCount = p.stockItems.length;
 

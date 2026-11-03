@@ -80,7 +80,7 @@ function getInitialApi(): string {
   if (typeof window === 'undefined') return '';
   if (window.__API_URL__) return window.__API_URL__;
   if (isLocalhost) return 'http://localhost:4000';
-  return 'https://aa642858e34644.lhr.life';
+  return 'https://dde4203afb5e37.lhr.life';
 }
 
 // Trích xuất dữ liệu người dùng thực tế từ Telegram WebApp SDK
@@ -415,7 +415,7 @@ export default function App() {
     }));
 
     // 2. Đồng bộ thời gian thực từ Backend API (localhost hoặc tunnel nếu có)
-    const activeApi = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://aa642858e34644.lhr.life');
+    const activeApi = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://dde4203afb5e37.lhr.life');
     if (effectiveTeleId) {
       fetch(`${activeApi}/api/user/sync?telegramId=${effectiveTeleId}`, {
         method: 'GET',
@@ -507,7 +507,7 @@ export default function App() {
 
   // Tải dữ liệu sản phẩm & danh mục
   async function loadData() {
-    const activeApi = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://aa642858e34644.lhr.life');
+    const activeApi = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://dde4203afb5e37.lhr.life');
     if (activeApi) {
       try {
         const prods = await fetch(`${activeApi}/api/products`, {
@@ -582,7 +582,7 @@ export default function App() {
       return;
     }
 
-    const activeApi = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://aa642858e34644.lhr.life');
+    const activeApi = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://dde4203afb5e37.lhr.life');
     let backendSuccess = false;
     let deliveredKey = '';
     let newBal = profile.balance - price;
@@ -741,7 +741,7 @@ export default function App() {
   // ============================================================
   // ADMIN DASHBOARD HANDLERS (Sản phẩm, Người dùng, Đơn hàng)
   // ============================================================
-  const adminBaseUrl = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://aa642858e34644.lhr.life');
+  const adminBaseUrl = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://dde4203afb5e37.lhr.life');
   const getAdminHeaders = () => ({
     'Content-Type': 'application/json',
     'x-admin-key': adminKey || 'hai1110',

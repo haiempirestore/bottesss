@@ -161,13 +161,14 @@ export default function AdminApp() {
     setLoading(true);
     const h = getHeaders(overrideKey);
     try {
-      const [ovRes, prodRes, userRes, orderRes, botRes, setRes] = await Promise.all([
+      const [ovRes, prodRes, userRes, orderRes, botRes, setRes, catRes] = await Promise.all([
         fetch(`${apiUrl}/api/admin/overview`, { headers: h }).then(r => r.ok ? r.json() : null).catch(() => null),
         fetch(`${apiUrl}/api/admin/products`, { headers: h }).then(r => r.ok ? r.json() : []).catch(() => []),
         fetch(`${apiUrl}/api/admin/users`, { headers: h }).then(r => r.ok ? r.json() : []).catch(() => []),
         fetch(`${apiUrl}/api/admin/orders`, { headers: h }).then(r => r.ok ? r.json() : []).catch(() => []),
         fetch(`${apiUrl}/api/admin/bot/status`, { headers: h }).then(r => r.ok ? r.json() : null).catch(() => null),
-        fetch(`${apiUrl}/api/admin/settings`, { headers: h }).then(r => r.ok ? r.json() : null).catch(() => null)
+        fetch(`${apiUrl}/api/admin/settings`, { headers: h }).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(`${apiUrl}/api/categories`).then(r => r.ok ? r.json() : []).catch(() => [])
       ]);
 
       if (ovRes) {
@@ -179,12 +180,15 @@ export default function AdminApp() {
         setBotStatus(botRes);
         setStoreSettings(setRes);
 
-        // Extract unique categories
-        const catMap = new Map();
-        (prodRes || []).forEach((p: any) => {
-          if (p.category?.id) catMap.set(p.category.id, p.category);
-        });
-        setCategories(Array.from(catMap.values()));
+        if (Array.isArray(catRes) && catRes.length > 0) {
+          setCategories(catRes);
+        } else {
+          const catMap = new Map();
+          (prodRes || []).forEach((p: any) => {
+            if (p.category?.id) catMap.set(p.category.id, p.category);
+          });
+          setCategories(Array.from(catMap.values()));
+        }
       } else {
         // If 401 or null and we have no stored key verification
         if (!overrideKey && adminKey) {

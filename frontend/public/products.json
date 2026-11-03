@@ -193,11 +193,8 @@
         "createdAt": "2026-11-02T18:31:40.623Z",
         "updatedAt": "2026-11-02T18:31:40.623Z"
       },
-      "stockCount": 2,
-      "stockItems": [
-        "LICENSE_DOWN_TOOL_HAI1110_T1T2T3T4",
-        "LICENSE_DOWN_TOOL_HAI1110_D5D6D7D8"
-      ]
+      "stockCount": 0,
+      "stockItems": []
     },
     {
       "id": "cmvzlq7yg0001dlxxxkn8qbaa",
@@ -218,9 +215,8 @@
         "createdAt": "2026-11-02T18:31:40.623Z",
         "updatedAt": "2026-11-02T18:31:40.623Z"
       },
-      "stockCount": 2,
+      "stockCount": 1,
       "stockItems": [
-        "LICENSE_FB_TOOL_HAI1110_A1B2C3D4",
         "LICENSE_FB_TOOL_HAI1110_E5F6G7H8"
       ]
     },
@@ -243,9 +239,8 @@
         "createdAt": "2026-11-02T18:31:40.625Z",
         "updatedAt": "2026-11-02T18:31:40.625Z"
       },
-      "stockCount": 2,
+      "stockCount": 1,
       "stockItems": [
-        "spotify_key_1yr_code_ABC1110",
         "spotify_key_1yr_code_ABC1110_backup"
       ]
     },
@@ -560,5 +555,5 @@
       "stockItems": []
     }
   ],
-  "updatedAt": "2026-11-03T00:12:55.484Z"
+  "updatedAt": "2026-11-03T00:18:50.692Z"
 }
