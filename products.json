@@ -171,11 +171,8 @@
         "createdAt": "2026-11-02T18:31:40.624Z",
         "updatedAt": "2026-11-02T18:31:40.624Z"
       },
-      "stockCount": 2,
-      "stockItems": [
-        "hehe|hihi",
-        "hoho|haha"
-      ]
+      "stockCount": 0,
+      "stockItems": []
     },
     {
       "id": "cmvzlq7yk0005dlxxky76xxgv",
@@ -537,11 +534,8 @@
         "createdAt": "2026-11-02T16:50:21.308Z",
         "updatedAt": "2026-11-02T16:50:21.308Z"
       },
-      "stockCount": 2,
-      "stockItems": [
-        "spotify_key_1yr_code_ABC1110",
-        "spotify_key_1yr_code_XYZ2026"
-      ]
+      "stockCount": 0,
+      "stockItems": []
     },
     {
       "id": "cmvzhvx1a0003dl5nj1lhf7cy",
@@ -562,12 +556,9 @@
         "createdAt": "2026-11-02T16:50:21.308Z",
         "updatedAt": "2026-11-02T16:50:21.308Z"
       },
-      "stockCount": 2,
-      "stockItems": [
-        "netflix2@shop.com:matkhau456 | PIN: 1110",
-        "netflix3@shop.com:matkhau789 | PIN: 1110"
-      ]
+      "stockCount": 0,
+      "stockItems": []
     }
   ],
-  "updatedAt": "2026-11-02T23:44:49.750Z"
+  "updatedAt": "2026-11-03T00:12:55.484Z"
 }
