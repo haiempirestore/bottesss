@@ -1728,7 +1728,7 @@ if (botToken) {
       const availableCount = cat.products.reduce((acc, p) => acc + p.stockItems.length, 0);
       const hasStock = availableCount > 0;
       return {
-        text: `${hasStock ? '🟢' : '🔴'} ${cat.name} (${availableCount})`,
+        text: `${cat.name} (${availableCount})`,
         callback_data: hasStock ? `cat_slug:${cat.slug}` : `outofstock:${cat.slug}`,
         style: hasStock ? 'success' : 'danger'
       };
