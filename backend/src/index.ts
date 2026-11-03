@@ -1555,17 +1555,13 @@ if (botToken) {
 
   const miniAppUrl = (process.env.MINI_APP_URL || 'https://haiempirestore.github.io/bottesss/').trim();
 
-  // 1. Tự động thiết lập Menu Button góc trái dưới của Telegram
-  if (miniAppUrl.startsWith('https://')) {
-    bot.telegram.setChatMenuButton({
-      menuButton: {
-        type: 'web_app',
-        text: '🛍 MỞ CỬA HÀNG',
-        web_app: { url: miniAppUrl }
-      }
-    }).then(() => console.log('✅ Đã cấu hình Menu Button góc trái Telegram:', miniAppUrl))
-      .catch(err => console.error('Lỗi setChatMenuButton:', err));
-  }
+  // 1. Cấu hình Menu Button cạnh thanh chat thành Menu gọi lệnh (Commands)
+  bot.telegram.setChatMenuButton({
+    menuButton: {
+      type: 'commands'
+    }
+  }).then(() => console.log('✅ Đã cấu hình Menu Button cạnh thanh chat thành menu gọi lệnh'))
+    .catch(err => console.error('Lỗi setChatMenuButton:', err));
 
   // 2. Cấu hình danh sách lệnh cho thanh Menu Telegram
   bot.telegram.setMyCommands([
@@ -1574,6 +1570,7 @@ if (botToken) {
     { command: 'nap', description: '💳 Nạp tiền vào ví qua VietQR' },
     { command: 'me', description: '👤 Xem số dư ví & thông tin tài khoản' },
     { command: 'orders', description: '📦 Đơn hàng đã mua & nhận key' },
+    { command: 'app', description: '🛍️ Mở Mini App cửa hàng' },
     { command: 'support', description: '💬 Liên hệ hỗ trợ kỹ thuật' }
   ]).then(() => console.log('✅ Đã cấu hình danh sách lệnh Bot (/start, /products, /nap...)'))
     .catch(err => console.error('Lỗi setMyCommands:', err));
