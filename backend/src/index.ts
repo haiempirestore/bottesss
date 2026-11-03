@@ -348,16 +348,31 @@ app.post('/api/orders/checkout', async (req, res) => {
       });
     }
 
-    // Lấy key từ kho
-    let deliveredKey = customKey?.trim() || '';
+    // Lấy key từ kho (ưu tiên key sẵn có trong kho và đánh dấu đã bán SOLD để không bị trùng)
+    let deliveredKey = '';
     let stockIdToSold: string | null = null;
+
+    if (customKey && customKey.trim()) {
+      const match = product.stockItems.find(s => s.payload === customKey.trim());
+      if (match) {
+        deliveredKey = match.payload;
+        stockIdToSold = match.id;
+      }
+    }
+
     if (!deliveredKey) {
       const stock = product.stockItems[0];
       if (stock) {
         deliveredKey = stock.payload;
         stockIdToSold = stock.id;
       } else {
-        deliveredKey = `Tài khoản: hai1110_${Date.now().toString(36)}@shop.vip | Mật khẩu: Hai1110@${crypto.randomInt(100000, 999999)}`;
+        const randPass = crypto.randomInt(100000, 999999);
+        const isLink = product.name.toLowerCase().includes('link') || product.name.toLowerCase().includes('mời') || product.name.toLowerCase().includes('group');
+        if (isLink) {
+          deliveredKey = `https://hai1110.vip/join/${Date.now().toString(36)}`;
+        } else {
+          deliveredKey = `Tài khoản: hai1110_${Date.now().toString(36).slice(-5)}@shop.vip | Mật khẩu: Hai1110@${randPass}`;
+        }
       }
     }
 
@@ -366,7 +381,9 @@ app.post('/api/orders/checkout', async (req, res) => {
     const [updatedUser, order] = await prisma.$transaction([
       prisma.user.update({
         where: { id: user.id },
-        data: { balance: { decrement: price } }
+        data: {
+          balance: { decrement: price }
+        }
       }),
       prisma.order.create({
         data: {

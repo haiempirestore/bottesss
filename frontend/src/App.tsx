@@ -78,8 +78,9 @@ const isLocalhost = typeof window !== 'undefined' && (
 
 function getInitialApi(): string {
   if (typeof window === 'undefined') return '';
+  if (window.__API_URL__) return window.__API_URL__;
   if (isLocalhost) return 'http://localhost:4000';
-  return '';
+  return 'https://aa642858e34644.lhr.life';
 }
 
 // Trích xuất dữ liệu người dùng thực tế từ Telegram WebApp SDK
@@ -414,11 +415,14 @@ export default function App() {
     }));
 
     // 2. Đồng bộ thời gian thực từ Backend API (localhost hoặc tunnel nếu có)
-    const activeApi = apiUrl || 'http://localhost:4000';
+    const activeApi = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://aa642858e34644.lhr.life');
     if (effectiveTeleId) {
       fetch(`${activeApi}/api/user/sync?telegramId=${effectiveTeleId}`, {
         method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
+        headers: {
+          'Content-Type': 'application/json',
+          'bypass-tunnel-reminder': 'true'
+        }
       })
         .then(r => r.ok ? r.json() : null)
         .then(data => {
@@ -449,6 +453,43 @@ export default function App() {
     }
   }, [apiUrl]);
 
+  // Quản lý kho key đã dùng để tránh gửi lặp lại tài khoản/mật khẩu
+  const getUsedKeys = (): string[] => {
+    try {
+      const saved = localStorage.getItem('HAI1110_USED_KEYS');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const markKeyUsed = (k: string) => {
+    if (!k) return;
+    try {
+      const keys = getUsedKeys();
+      if (!keys.includes(k)) {
+        keys.push(k);
+        localStorage.setItem('HAI1110_USED_KEYS', JSON.stringify(keys));
+      }
+    } catch {}
+  };
+
+  const filterUsedKeysFromProducts = (prods: Product[]): Product[] => {
+    const used = getUsedKeys();
+    if (!used.length) return prods;
+    return prods.map(p => {
+      if (!p.stockItems || !p.stockItems.length) return p;
+      const cleanStock = p.stockItems.filter(item => {
+        const k = typeof item === 'string' ? item : item?.payload;
+        return !used.includes(k);
+      });
+      return {
+        ...p,
+        stockItems: cleanStock
+      };
+    });
+  };
+
   // Timer 2FA đếm lùi
   useEffect(() => {
     const timer = setInterval(() => {
@@ -466,12 +507,21 @@ export default function App() {
 
   // Tải dữ liệu sản phẩm & danh mục
   async function loadData() {
-    if (apiUrl) {
+    const activeApi = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://aa642858e34644.lhr.life');
+    if (activeApi) {
       try {
-        const prods = await fetch(`${apiUrl}/api/products`).then((r) => r.json());
-        if (Array.isArray(prods)) setProducts(prods);
-        const cats = await fetch(`${apiUrl}/api/categories`).then((r) => r.json());
-        if (Array.isArray(cats)) setCategories(cats);
+        const prods = await fetch(`${activeApi}/api/products`, {
+          headers: { 'bypass-tunnel-reminder': 'true' }
+        }).then((r) => r.json());
+        if (Array.isArray(prods) && prods.length > 0) {
+          setProducts(filterUsedKeysFromProducts(prods));
+        }
+        const cats = await fetch(`${activeApi}/api/categories`, {
+          headers: { 'bypass-tunnel-reminder': 'true' }
+        }).then((r) => r.json());
+        if (Array.isArray(cats) && cats.length > 0) {
+          setCategories(cats);
+        }
         return;
       } catch (_e) {}
     }
@@ -481,7 +531,7 @@ export default function App() {
       const res = await fetch('./products.json');
       if (res.ok) {
         const json = await res.json();
-        if (json.products) setProducts(json.products);
+        if (json.products) setProducts(filterUsedKeysFromProducts(json.products));
         if (json.categories) setCategories(json.categories);
         if (json.botUsername) setBotUsername(json.botUsername);
         if (json.bankConfig) setBankConfig(json.bankConfig);
@@ -532,8 +582,103 @@ export default function App() {
       return;
     }
 
-    // 2. Đủ số dư -> Tiến hành thanh toán ngay trên Mini App
-    const newBal = profile.balance - price;
+    const activeApi = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://aa642858e34644.lhr.life');
+    let backendSuccess = false;
+    let deliveredKey = '';
+    let newBal = profile.balance - price;
+    let orderCode = `DH${Date.now().toString(36).toUpperCase()}`;
+    let newOrder: any = null;
+
+    // 2. Gọi Checkout lên Backend API để trừ tiền thực tế trên Bot & kho SQLite
+    try {
+      const res = await fetch(`${activeApi}/api/orders/checkout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'bypass-tunnel-reminder': 'true'
+        },
+        body: JSON.stringify({
+          telegramId: profile.telegramId || '6632274262',
+          productId: p.id
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.ok) {
+          backendSuccess = true;
+          deliveredKey = data.delivery || data.deliveredKey || data.order?.accountKey || '';
+          newBal = Number(data.newBalance);
+          orderCode = data.order?.code || orderCode;
+          newOrder = {
+            id: data.order?.id || `ord_${Date.now()}`,
+            code: orderCode,
+            productId: p.id,
+            productName: p.name,
+            total: price,
+            status: 'DELIVERED',
+            accountKey: deliveredKey,
+            date: data.order?.date || new Date().toISOString()
+          };
+        } else if (data?.error === 'INSUFFICIENT_BALANCE') {
+          showToast('Số dư trên bot không đủ để thực hiện giao dịch!');
+          return;
+        }
+      }
+    } catch (_err) {
+      // Backend offline hoặc lỗi kết nối, chuyển sang chế độ client-side fallback
+    }
+
+    // 3. Fallback cục bộ nếu không có kết nối backend
+    if (!backendSuccess) {
+      const used = getUsedKeys();
+      const availableItems = (p.stockItems || [])
+        .map((item) => (typeof item === 'string' ? item : (item?.payload || '')))
+        .filter((k) => k && !used.includes(k));
+
+      if (availableItems.length > 0) {
+        deliveredKey = availableItems[0];
+      } else {
+        const randPass = Math.floor(100000 + Math.random() * 900000);
+        const isLink = p.name.toLowerCase().includes('link') || p.name.toLowerCase().includes('mời') || p.name.toLowerCase().includes('group');
+        if (isLink) {
+          deliveredKey = `https://hai1110.vip/join/${Date.now().toString(36)}`;
+        } else {
+          deliveredKey = `Tài khoản: hai1110_${Date.now().toString(36).slice(-5)}@digital.vip | Mật khẩu: Hai1110@${randPass}`;
+        }
+      }
+
+      newOrder = {
+        id: `ord_${Date.now()}`,
+        code: orderCode,
+        productId: p.id,
+        productName: p.name,
+        total: price,
+        status: 'DELIVERED',
+        accountKey: deliveredKey,
+        date: new Date().toISOString()
+      };
+    }
+
+    // 4. Đánh dấu key đã sử dụng để không giao trùng
+    markKeyUsed(deliveredKey);
+
+    // 5. Cập nhật state sản phẩm: loại bỏ key đã mua và giảm số lượng kho
+    setProducts((prev) =>
+      prev.map((prod) => {
+        if (prod.id !== p.id) return prod;
+        const cleanStock = (prod.stockItems || []).filter((item) => {
+          const k = typeof item === 'string' ? item : item?.payload;
+          return k !== deliveredKey;
+        });
+        return {
+          ...prod,
+          stockItems: cleanStock
+        };
+      })
+    );
+
+    // 6. Cập nhật số dư người dùng trên giao diện Mini App
     setProfile((prev: any) => ({
       ...prev,
       balance: newBal,
@@ -541,38 +686,14 @@ export default function App() {
     }));
     localStorage.setItem('HAI1110_BALANCE', String(newBal));
 
-    // Lấy thông tin tài khoản / mật khẩu / link từ kho sản phẩm
-    let deliveredKey = '';
-    if (p.stockItems && p.stockItems.length > 0) {
-      deliveredKey = typeof p.stockItems[0] === 'string' ? p.stockItems[0] : (p.stockItems[0].payload || '');
-    }
-    if (!deliveredKey) {
-      const randPass = Math.floor(100000 + Math.random() * 900000);
-      const isLink = p.name.toLowerCase().includes('link') || p.name.toLowerCase().includes('mời') || p.name.toLowerCase().includes('group');
-      if (isLink) {
-        deliveredKey = `https://hai1110.vip/join/${Date.now().toString(36)}`;
-      } else {
-        deliveredKey = `Tài khoản: hai1110_${Date.now().toString(36).slice(-5)}@digital.vip | Mật khẩu: Hai1110@${randPass}`;
-      }
-    }
+    // 7. Cập nhật lịch sử đơn hàng
+    setMyOrders((prev) => {
+      const updated = [newOrder, ...prev];
+      localStorage.setItem('HAI1110_ORDERS', JSON.stringify(updated));
+      return updated;
+    });
 
-    const orderCode = `DH${Date.now().toString(36).toUpperCase()}`;
-    const newOrder = {
-      id: `ord_${Date.now()}`,
-      code: orderCode,
-      productId: p.id,
-      productName: p.name,
-      total: price,
-      status: 'DELIVERED',
-      accountKey: deliveredKey,
-      date: new Date().toISOString()
-    };
-
-    const updatedOrders = [newOrder, ...myOrders];
-    setMyOrders(updatedOrders);
-    localStorage.setItem('HAI1110_ORDERS', JSON.stringify(updatedOrders));
-
-    // Hiển thị Popup kết quả bàn giao tài khoản/mật khẩu/link NGAY TRÊN MINI APP
+    // 8. Hiển thị Popup kết quả bàn giao tài khoản/mật khẩu/link NGAY TRÊN MINI APP
     setPurchaseResultModal({
       open: true,
       order: newOrder,
@@ -584,21 +705,7 @@ export default function App() {
     if (soundEnabled) playTingSound();
     window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
 
-    // Đồng bộ về backend API nếu có kết nối
-    const activeApi = apiUrl || 'http://localhost:4000';
-    try {
-      fetch(`${activeApi}/api/orders/checkout`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          telegramId: profile.telegramId || '6632274262',
-          productId: p.id,
-          customKey: deliveredKey
-        })
-      }).catch(() => {});
-    } catch {}
-
-    // Gửi dữ liệu qua Telegram WebApp SDK để bot lưu vào lịch sử
+    // Gửi dữ liệu qua Telegram WebApp SDK để bot lưu vào lịch sử nếu có
     try {
       window.Telegram?.WebApp?.sendData?.(JSON.stringify({
         action: 'PURCHASE_SYNC',
@@ -634,10 +741,11 @@ export default function App() {
   // ============================================================
   // ADMIN DASHBOARD HANDLERS (Sản phẩm, Người dùng, Đơn hàng)
   // ============================================================
-  const adminBaseUrl = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'http://localhost:4000');
+  const adminBaseUrl = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://aa642858e34644.lhr.life');
   const getAdminHeaders = () => ({
     'Content-Type': 'application/json',
-    'x-admin-key': adminKey || 'hai1110'
+    'x-admin-key': adminKey || 'hai1110',
+    'bypass-tunnel-reminder': 'true'
   });
 
   const loadAdminData = async () => {
