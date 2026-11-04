@@ -4,15 +4,15 @@
    ============================================================ */
 
 :root {
-  --admin-bg: #090306;
-  --admin-bg-sidebar: #0f050b;
-  --admin-bg-card: #150710;
-  --admin-bg-card-hover: #1c0a16;
-  --admin-border: rgba(255, 36, 83, 0.15);
-  --admin-border-active: rgba(255, 36, 83, 0.4);
-  --admin-accent: #ff2453;
-  --admin-accent-glow: rgba(255, 36, 83, 0.3);
-  --admin-accent-hover: #ff4772;
+  --admin-bg: #090412;
+  --admin-bg-sidebar: #0e061c;
+  --admin-bg-card: #150926;
+  --admin-bg-card-hover: #1c0e35;
+  --admin-border: rgba(168, 85, 247, 0.15);
+  --admin-border-active: rgba(168, 85, 247, 0.4);
+  --admin-accent: #a855f7;
+  --admin-accent-glow: rgba(168, 85, 247, 0.3);
+  --admin-accent-hover: #c084fc;
   --admin-success: #10b981;
   --admin-warning: #f59e0b;
   --admin-danger: #ef4444;
@@ -72,7 +72,7 @@ body {
   width: 44px;
   height: 44px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #ff2453 0%, #a00b2e 100%);
+  background: linear-gradient(135deg, #a855f7 0%, #6b21a8 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -136,14 +136,14 @@ body {
 }
 
 .admin-nav-item:hover {
-  background: rgba(255, 36, 83, 0.08);
+  background: rgba(168, 85, 247, 0.08);
   color: #fff;
 }
 
 .admin-nav-item.active {
-  background: linear-gradient(90deg, rgba(255, 36, 83, 0.22) 0%, rgba(255, 36, 83, 0.05) 100%);
+  background: linear-gradient(90deg, rgba(168, 85, 247, 0.22) 0%, rgba(168, 85, 247, 0.05) 100%);
   color: #fff;
-  border-color: rgba(255, 36, 83, 0.4);
+  border-color: rgba(168, 85, 247, 0.4);
   font-weight: 700;
   box-shadow: inset 3px 0 0 var(--admin-accent);
 }
@@ -154,7 +154,7 @@ body {
   font-weight: 700;
   padding: 2px 7px;
   border-radius: 10px;
-  background: rgba(255, 36, 83, 0.15);
+  background: rgba(168, 85, 247, 0.15);
   color: var(--admin-accent);
 }
 
@@ -178,14 +178,14 @@ body {
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  background: linear-gradient(135deg, #ff2453 0%, #300612 100%);
+  background: linear-gradient(135deg, #a855f7 0%, #300612 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 800;
   font-size: 15px;
   color: #fff;
-  border: 1px solid rgba(255, 36, 83, 0.4);
+  border: 1px solid rgba(168, 85, 247, 0.4);
 }
 
 .admin-user-info {
@@ -214,7 +214,7 @@ body {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  background: radial-gradient(circle at 85% 10%, rgba(255, 36, 83, 0.04) 0%, transparent 60%);
+  background: radial-gradient(circle at 85% 10%, rgba(168, 85, 247, 0.04) 0%, transparent 60%);
 }
 
 /* Topbar */
@@ -333,7 +333,7 @@ body {
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  background: rgba(255, 36, 83, 0.12);
+  background: rgba(168, 85, 247, 0.12);
   color: var(--admin-accent);
   display: flex;
   align-items: center;
@@ -400,15 +400,15 @@ body {
 }
 
 .btn-admin-primary {
-  background: linear-gradient(135deg, #ff2453 0%, #cb153d 100%);
+  background: linear-gradient(135deg, #a855f7 0%, #cb153d 100%);
   color: #fff;
-  box-shadow: 0 4px 14px rgba(255, 36, 83, 0.35);
+  box-shadow: 0 4px 14px rgba(168, 85, 247, 0.35);
 }
 
 .btn-admin-primary:hover {
-  background: linear-gradient(135deg, #ff4772 0%, #e01744 100%);
+  background: linear-gradient(135deg, #c084fc 0%, #e01744 100%);
   transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(255, 36, 83, 0.45);
+  box-shadow: 0 6px 18px rgba(168, 85, 247, 0.45);
 }
 
 .btn-admin-secondary {
@@ -418,7 +418,7 @@ body {
 }
 
 .btn-admin-secondary:hover {
-  background: rgba(255, 36, 83, 0.1);
+  background: rgba(168, 85, 247, 0.1);
   border-color: var(--admin-accent);
 }
 
@@ -490,13 +490,13 @@ body {
 
 .admin-table td {
   padding: 16px 18px;
-  border-bottom: 1px solid rgba(255, 36, 83, 0.08);
+  border-bottom: 1px solid rgba(168, 85, 247, 0.08);
   color: var(--admin-text-main);
   vertical-align: middle;
 }
 
 .admin-table tr:hover td {
-  background: rgba(255, 36, 83, 0.03);
+  background: rgba(168, 85, 247, 0.03);
 }
 
 /* Table Badge & Elements */
@@ -609,7 +609,7 @@ textarea.admin-form-control {
   max-width: 580px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 30px rgba(255, 36, 83, 0.15);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 30px rgba(168, 85, 247, 0.15);
   animation: modalScaleIn 0.2s ease;
 }
 
@@ -663,7 +663,7 @@ textarea.admin-form-control {
 /* Code / Key display box */
 .key-box-display {
   background: rgba(0, 0, 0, 0.5);
-  border: 1px dashed rgba(255, 36, 83, 0.3);
+  border: 1px dashed rgba(168, 85, 247, 0.3);
   border-radius: 8px;
   padding: 8px 12px;
   font-family: var(--font-mono);
@@ -695,7 +695,7 @@ textarea.admin-form-control {
   padding: 14px;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.03);
-  border: 1px dashed rgba(255, 36, 83, 0.25);
+  border: 1px dashed rgba(168, 85, 247, 0.25);
   margin-bottom: 16px;
 }
 
@@ -704,7 +704,7 @@ textarea.admin-form-control {
   height: 68px;
   border-radius: 14px;
   background: #140710;
-  border: 1px solid rgba(255, 36, 83, 0.3);
+  border: 1px solid rgba(168, 85, 247, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -748,7 +748,7 @@ textarea.admin-form-control {
   width: 6px;
 }
 .icon-picker-grid::-webkit-scrollbar-thumb {
-  background: rgba(255, 36, 83, 0.3);
+  background: rgba(168, 85, 247, 0.3);
   border-radius: 10px;
 }
 
@@ -768,15 +768,15 @@ textarea.admin-form-control {
 }
 
 .icon-picker-btn:hover {
-  background: rgba(255, 36, 83, 0.12);
-  border-color: rgba(255, 36, 83, 0.4);
+  background: rgba(168, 85, 247, 0.12);
+  border-color: rgba(168, 85, 247, 0.4);
   transform: translateY(-2px);
 }
 
 .icon-picker-btn.active {
-  background: rgba(255, 36, 83, 0.2);
-  border-color: #ff2453;
-  box-shadow: 0 0 12px rgba(255, 36, 83, 0.4);
+  background: rgba(168, 85, 247, 0.2);
+  border-color: #a855f7;
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.4);
 }
 
 .icon-picker-btn img {
@@ -802,18 +802,18 @@ textarea.admin-form-control {
   gap: 8px;
   padding: 10px 14px;
   border-radius: 10px;
-  background: rgba(255, 36, 83, 0.08);
-  border: 1px dashed rgba(255, 36, 83, 0.3);
+  background: rgba(168, 85, 247, 0.08);
+  border: 1px dashed rgba(168, 85, 247, 0.3);
   cursor: pointer;
-  color: #ff4772;
+  color: #c084fc;
   font-size: 12.5px;
   font-weight: 600;
   transition: all 0.2s ease;
 }
 
 .file-upload-dropzone:hover {
-  background: rgba(255, 36, 83, 0.15);
-  border-color: #ff2453;
+  background: rgba(168, 85, 247, 0.15);
+  border-color: #a855f7;
 }
 
 /* Category grid cards */
@@ -852,7 +852,7 @@ textarea.admin-form-control {
   height: 48px;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 36, 83, 0.2);
+  border: 1px solid rgba(168, 85, 247, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;

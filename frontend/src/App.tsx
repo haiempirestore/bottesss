@@ -100,14 +100,14 @@ function getInitialApi(): string {
     }
   } catch {}
 
-  // 3. Biến toàn cục từ config.js
-  if (window.__API_URL__) return window.__API_URL__;
-
-  // 4. Localhost
+  // 3. Nếu đang chạy localhost
   if (isLocalhost) return 'http://localhost:4000';
 
+  // 4. Biến toàn cục từ config.js
+  if (window.__API_URL__) return window.__API_URL__;
+
   // 5. Fallback URL
-  return 'https://670586b9f53e6b.lhr.life';
+  return 'https://9f3adaebbde4fc.lhr.life';
 }
 
 // Trích xuất dữ liệu người dùng thực tế từ Telegram WebApp SDK
@@ -179,11 +179,11 @@ function UserAvatar({ name, photoUrl, size = 36 }: { name?: string; photoUrl?: s
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        color: '#ff2453',
+        color: '#a855f7',
         fontWeight: 800,
         fontSize: Math.round(size * 0.44),
         fontFamily: 'var(--font-display)',
-        textShadow: '0 0 10px rgba(255, 36, 83, 0.6)',
+        textShadow: '0 0 10px rgba(168, 85, 247, 0.6)',
         userSelect: 'none'
       }}
     >
@@ -296,7 +296,11 @@ export default function App() {
   // Modals
   const [depositModalOpen, setDepositModalOpen] = useState(false);
   const [depositAmount, setDepositAmount] = useState(50000);
+  const [depositChecking, setDepositChecking] = useState(false);
   const [productModal, setProductModal] = useState<Product | null>(null);
+  const [confirmBuyProduct, setConfirmBuyProduct] = useState<Product | null>(null);
+  const [isPurchasing, setIsPurchasing] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
   const [purchaseResultModal, setPurchaseResultModal] = useState<{
     open: boolean;
     order: any;
@@ -450,7 +454,7 @@ export default function App() {
     }));
 
     // 2. Đồng bộ thời gian thực từ Backend API (localhost hoặc tunnel nếu có)
-    const activeApi = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://670586b9f53e6b.lhr.life');
+    const activeApi = apiUrl || (isLocalhost ? 'http://localhost:4000' : (window.__API_URL__ || 'https://9f3adaebbde4fc.lhr.life'));
     if (effectiveTeleId) {
       fetch(`${activeApi}/api/user/sync?telegramId=${effectiveTeleId}`, {
         method: 'GET',
@@ -720,30 +724,48 @@ export default function App() {
       });
   }, [products, searchQuery, selectedCategory, sortBy]);
 
-  // Hành động Mua hàng trực tiếp trên Mini App (Bàn giao tài khoản, mật khẩu hoặc link ngay tại chỗ!)
-  const handleBuyProduct = async (p: Product) => {
+  // 1. Nhấn nút Mua -> Kiểm tra số dư & Mở hộp thoại Xác Nhận Mua
+  const handleBuyProduct = (p: Product) => {
     if (soundEnabled) playTingSound();
     window.Telegram?.WebApp?.HapticFeedback?.impactOccurred('medium');
 
     const price = p.salePrice ?? p.price;
 
-    // 1. Kiểm tra số dư khả dụng trong ví
+    // Kiểm tra còn hàng hay không
+    if (p.stockItems && p.stockItems.length === 0) {
+      showToast('⚠️ Sản phẩm này hiện tại đã hết hàng!');
+      return;
+    }
+
+    // Kiểm tra số dư khả dụng trong ví
     if (profile.balance < price) {
       const missing = price - profile.balance;
       setDepositAmount(missing > 10000 ? missing : 10000);
       setDepositModalOpen(true);
-      showToast(`Số dư không đủ! Cần nạp thêm ${missing.toLocaleString('vi-VN')}đ để mua sản phẩm.`);
+      showToast(`Số dư không đủ! Cần nạp thêm ${missing.toLocaleString('vi-VN')}đ.`);
       return;
     }
 
-    const activeApi = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://670586b9f53e6b.lhr.life');
+    // Mở hộp thoại hỏi: "Bạn có chắc chắn muốn mua hay không?"
+    setConfirmBuyProduct(p);
+  };
+
+  // 2. Người dùng bấm "Xác Nhận Mua" -> Bắn hiệu ứng mua pháo hoa + Trả tài khoản/mật khẩu
+  const executeBuyProduct = async (p: Product) => {
+    setIsPurchasing(true);
+    setShowConfetti(true);
+    if (soundEnabled) playTingSound();
+    window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
+
+    const price = p.salePrice ?? p.price;
+    const activeApi = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://f552b2ebbd2e74.lhr.life');
     let backendSuccess = false;
     let deliveredKey = '';
     let newBal = profile.balance - price;
     let orderCode = `DH${Date.now().toString(36).toUpperCase()}`;
     let newOrder: any = null;
 
-    // 2. Gọi Checkout lên Backend API để trừ tiền thực tế trên Bot & kho SQLite
+    // Gọi Checkout lên Backend API để trừ tiền và lấy key từ bot
     try {
       const res = await fetch(`${activeApi}/api/orders/checkout`, {
         method: 'POST',
@@ -776,6 +798,8 @@ export default function App() {
           };
         } else if (data?.error === 'INSUFFICIENT_BALANCE') {
           showToast('Số dư trên bot không đủ để thực hiện giao dịch!');
+          setIsPurchasing(false);
+          setConfirmBuyProduct(null);
           return;
         }
       }
@@ -783,7 +807,7 @@ export default function App() {
       // Backend offline hoặc lỗi kết nối, chuyển sang chế độ client-side fallback
     }
 
-    // 3. Fallback cục bộ nếu không có kết nối backend
+    // Fallback nếu mất mạng
     if (!backendSuccess) {
       const used = getUsedKeys();
       const availableItems = (p.stockItems || [])
@@ -814,10 +838,10 @@ export default function App() {
       };
     }
 
-    // 4. Đánh dấu key đã sử dụng để không giao trùng
+    // Đánh dấu key đã sử dụng
     markKeyUsed(deliveredKey);
 
-    // 5. Cập nhật state sản phẩm: loại bỏ key đã mua và giảm số lượng kho
+    // Cập nhật state sản phẩm
     setProducts((prev) =>
       prev.map((prod) => {
         if (prod.id !== p.id) return prod;
@@ -832,7 +856,7 @@ export default function App() {
       })
     );
 
-    // 6. Cập nhật số dư người dùng trên giao diện Mini App
+    // Cập nhật số dư người dùng
     setProfile((prev: any) => ({
       ...prev,
       balance: newBal,
@@ -840,14 +864,19 @@ export default function App() {
     }));
     localStorage.setItem('HAI1110_BALANCE', String(newBal));
 
-    // 7. Cập nhật lịch sử đơn hàng
+    // Cập nhật lịch sử đơn hàng
     setMyOrders((prev) => {
       const updated = [newOrder, ...prev];
       localStorage.setItem('HAI1110_ORDERS', JSON.stringify(updated));
       return updated;
     });
 
-    // 8. Hiển thị Popup kết quả bàn giao tài khoản/mật khẩu/link NGAY TRÊN MINI APP
+    // Đóng popup xác nhận & modal xem chi tiết
+    setConfirmBuyProduct(null);
+    setProductModal(null);
+    setIsPurchasing(false);
+
+    // Hiển thị Popup kết quả trả tài khoản & mật khẩu NGAY TRÊN WEB
     setPurchaseResultModal({
       open: true,
       order: newOrder,
@@ -855,9 +884,6 @@ export default function App() {
       deliveredKey,
       newBalance: newBal
     });
-
-    if (soundEnabled) playTingSound();
-    window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success');
 
     // Gửi dữ liệu qua Telegram WebApp SDK để bot lưu vào lịch sử nếu có
     try {
@@ -869,6 +895,41 @@ export default function App() {
         key: deliveredKey
       }));
     } catch {}
+
+    setTimeout(() => setShowConfetti(false), 4500);
+  };
+
+  // Kiểm tra số dư nạp tiền tự động ngay trên web
+  const handleCheckDeposit = async () => {
+    setDepositChecking(true);
+    const activeApi = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://f552b2ebbd2e74.lhr.life');
+    try {
+      const res = await fetch(`${activeApi}/api/users/${profile.telegramId || '6632274262'}/profile`, {
+        headers: { 'bypass-tunnel-reminder': 'true' }
+      });
+      if (res.ok) {
+        const u = await res.json();
+        if (u && typeof u.balance === 'number') {
+          const oldBal = profile.balance;
+          setProfile((prev: any) => ({ ...prev, balance: u.balance }));
+          localStorage.setItem('HAI1110_BALANCE', String(u.balance));
+          if (u.balance > oldBal) {
+            setShowConfetti(true);
+            setTimeout(() => setShowConfetti(false), 4000);
+            showToast(`🎉 Nạp tiền thành công! Số dư mới: ${u.balance.toLocaleString('vi-VN')}đ`);
+            setDepositModalOpen(false);
+          } else {
+            showToast(`Đã kiểm tra! Số dư hiện tại: ${u.balance.toLocaleString('vi-VN')}đ`);
+          }
+        }
+      } else {
+        showToast('Chưa ghi nhận tiền vào. Hãy đợi 15-30 giây sau khi chuyển khoản!');
+      }
+    } catch {
+      showToast('Đang kết nối kiểm tra số dư...');
+    } finally {
+      setDepositChecking(false);
+    }
   };
 
   // Vòng quay may mắn
@@ -895,7 +956,7 @@ export default function App() {
   // ============================================================
   // ADMIN DASHBOARD HANDLERS (Sản phẩm, Người dùng, Đơn hàng)
   // ============================================================
-  const adminBaseUrl = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://670586b9f53e6b.lhr.life');
+  const adminBaseUrl = apiUrl || (isLocalhost ? 'http://localhost:4000' : (window.__API_URL__ || 'https://9f3adaebbde4fc.lhr.life'));
   const getAdminHeaders = () => ({
     'Content-Type': 'application/json',
     'x-admin-key': adminKey || 'hai1110',
@@ -1685,16 +1746,16 @@ export default function App() {
                   gap: '12px',
                   padding: '12px 14px',
                   borderRadius: '14px',
-                  background: 'rgba(255, 36, 83, 0.08)',
-                  border: '1px solid rgba(255, 36, 83, 0.25)',
+                  background: 'rgba(168, 85, 247, 0.08)',
+                  border: '1px solid rgba(168, 85, 247, 0.25)',
                   marginBottom: '12px'
                 }}>
                   <div style={{
                     width: '38px',
                     height: '38px',
                     borderRadius: '10px',
-                    background: '#150710',
-                    border: '1px solid rgba(255, 36, 83, 0.3)',
+                    background: '#140824',
+                    border: '1px solid rgba(168, 85, 247, 0.3)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -1747,7 +1808,7 @@ export default function App() {
                     onClick={() => setProductModal(p)}
                   >
                     {/* Thumbnail */}
-                    <div className="product-thumb-wrap" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle, #240b17 0%, #0c0409 100%)' }}>
+                    <div className="product-thumb-wrap" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle, #1a0928 0%, #0c0409 100%)' }}>
                       <img
                         src={p.imageUrl || './icons/star.svg'}
                         alt={p.name}
@@ -1876,7 +1937,7 @@ export default function App() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ fontSize: 14, color: '#fff', fontWeight: 700 }}>{o.productName}</div>
                       {o.total && (
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#ff2453', fontFamily: 'var(--font-mono)' }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#a855f7', fontFamily: 'var(--font-mono)' }}>
                           {Number(o.total).toLocaleString('vi-VN')} đ
                         </div>
                       )}
@@ -1890,12 +1951,12 @@ export default function App() {
 
                     <div style={{
                       background: 'rgba(0, 0, 0, 0.5)',
-                      border: '1px dashed rgba(255, 36, 83, 0.3)',
+                      border: '1px dashed rgba(168, 85, 247, 0.3)',
                       borderRadius: 10,
                       padding: '10px 12px',
                       marginTop: 4
                     }}>
-                      <div style={{ fontSize: 11, color: '#ff2453', fontWeight: 700, marginBottom: 4, textTransform: 'uppercase' }}>
+                      <div style={{ fontSize: 11, color: '#a855f7', fontWeight: 700, marginBottom: 4, textTransform: 'uppercase' }}>
                         🔑 Thông tin bàn giao / Tài khoản & Mật khẩu / Link:
                       </div>
                       <div style={{
@@ -2277,7 +2338,7 @@ export default function App() {
               {/* Product Info Card */}
               <div style={{
                 background: 'rgba(255, 255, 255, 0.03)',
-                border: '1px solid rgba(255, 36, 83, 0.2)',
+                border: '1px solid rgba(168, 85, 247, 0.2)',
                 borderRadius: 14,
                 padding: '14px',
                 marginBottom: 16,
@@ -2288,7 +2349,7 @@ export default function App() {
                 <img
                   src={purchaseResultModal.product.imageUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=100&q=80'}
                   alt=""
-                  style={{ width: 48, height: 48, borderRadius: 10, objectFit: 'cover', border: '1px solid rgba(255, 36, 83, 0.3)' }}
+                  style={{ width: 48, height: 48, borderRadius: 10, objectFit: 'cover', border: '1px solid rgba(168, 85, 247, 0.3)' }}
                 />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -2305,14 +2366,14 @@ export default function App() {
 
               {/* Box Bàn giao Tài khoản / Mật khẩu / Link */}
               <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#ff2453', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#a855f7', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
                   <KeyRound size={15} /> THÔNG TIN BÀN GIAO (TÀI KHOẢN, MẬT KHẨU HOẶC LINK):
                 </div>
 
                 <div style={{
-                  background: 'linear-gradient(135deg, #180510 0%, #0d0309 100%)',
-                  border: '1px solid rgba(255, 36, 83, 0.4)',
-                  boxShadow: '0 0 20px rgba(255, 36, 83, 0.15)',
+                  background: 'linear-gradient(135deg, #160829 0%, #0c0414 100%)',
+                  border: '1px solid rgba(168, 85, 247, 0.4)',
+                  boxShadow: '0 0 20px rgba(168, 85, 247, 0.15)',
                   borderRadius: 14,
                   padding: '16px',
                   fontFamily: 'var(--font-mono)',
@@ -2336,13 +2397,13 @@ export default function App() {
                     gap: 8,
                     padding: '12px',
                     borderRadius: 12,
-                    background: 'linear-gradient(135deg, #ff2453 0%, #b80f36 100%)',
+                    background: 'linear-gradient(135deg, #a855f7 0%, #6b21a8 100%)',
                     color: '#fff',
                     border: 'none',
                     fontWeight: 800,
                     fontSize: 14,
                     cursor: 'pointer',
-                    boxShadow: '0 4px 16px rgba(255, 36, 83, 0.35)'
+                    boxShadow: '0 4px 16px rgba(168, 85, 247, 0.35)'
                   }}
                 >
                   <Copy size={16} /> SAO CHÉP TOÀN BỘ THÔNG TIN (1 CHẠM)
@@ -2395,47 +2456,86 @@ export default function App() {
           MODAL NẠP TIỀN VIETQR (VIETCOMBANK)
       ======================================================== */}
       {depositModalOpen && (
-        <div className="modal-overlay" onClick={() => setDepositModalOpen(false)}>
+        <div className="modal-overlay" onClick={() => !depositChecking && setDepositModalOpen(false)}>
           <div className="modal-sheet" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3 className="modal-title">Nạp tiền vào ví (Vietcombank)</h3>
-              <button className="modal-close-btn" onClick={() => setDepositModalOpen(false)}>
-                <X size={18} />
-              </button>
+              <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--primary)' }}>
+                <CreditCard size={18} /> Nạp Tiền Vào Ví (Vietcombank)
+              </h3>
+              {!depositChecking && (
+                <button className="modal-close-btn" onClick={() => setDepositModalOpen(false)}>
+                  <X size={18} />
+                </button>
+              )}
             </div>
 
-            <p style={{ fontSize: 12.5, color: 'var(--text-sub)' }}>
-              Quét mã VietQR chuyển khoản theo đúng nội dung để hệ thống tự động duyệt tiền vào ví sau 10 giây.
+            <p style={{ fontSize: 12.5, color: 'var(--text-sub)', margin: '4px 0 10px' }}>
+              Nhập số tiền muốn nạp. Quét mã QR chuyển khoản đúng nội dung bên dưới, hệ thống sẽ tự động duyệt tiền vào ví sau 10 giây!
             </p>
 
+            {/* Ô nhập số tiền tuỳ ý của người dùng */}
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--primary)', display: 'block', marginBottom: 6 }}>
+                NHẬP SỐ TIỀN MUỐN NẠP (VNĐ):
+              </label>
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <input
+                  type="number"
+                  min={1000}
+                  step={5000}
+                  value={depositAmount || ''}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setDepositAmount(val >= 0 ? val : 0);
+                  }}
+                  placeholder="Nhập số tiền muốn nạp (VD: 50000)"
+                  className="form-control"
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 800,
+                    color: '#fff',
+                    paddingRight: 45,
+                    border: '1.5px solid var(--primary)',
+                    boxShadow: '0 0 14px rgba(168, 85, 247, 0.25)',
+                    background: 'var(--bg-card-elevated)',
+                    borderRadius: 12
+                  }}
+                />
+                <span style={{ position: 'absolute', right: 14, fontWeight: 800, color: 'var(--primary)', fontSize: 16 }}>
+                  đ
+                </span>
+              </div>
+            </div>
+
             {/* Chọn số tiền nhanh */}
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {[20000, 50000, 100000, 200000, 500000].map((amt) => (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
+              {[10000, 20000, 50000, 100000, 200000, 500000].map((amt) => (
                 <button
                   key={amt}
                   className={`chip-btn ${depositAmount === amt ? 'active' : ''}`}
                   onClick={() => setDepositAmount(amt)}
+                  style={{ fontSize: 12, padding: '5px 10px' }}
                 >
-                  {amt.toLocaleString('vi-VN')} đ
+                  +{amt >= 1000000 ? `${amt / 1000000}tr` : `${amt / 1000}k`}
                 </button>
               ))}
             </div>
 
-            {/* Khung mã QR Chuyển khoản Cute Độc quyền Shop Hai1110# */}
+            {/* Khung mã QR Chuyển khoản Tự Động Tạo Theo Số Tiền */}
             <div className="bunny-qr-container">
               <img src="./hai1110_qr_template.png" alt="Khung QR Chuyển khoản" className="bunny-qr-template" />
               <img
-                src={`https://img.vietqr.io/image/970436-HAI100TR-qr_only.png?amount=${depositAmount}&addInfo=NAP${profile?.telegramId || '6632274262'}&accountName=NGUYEN%20HOANG%20HAI`}
+                src={`https://img.vietqr.io/image/970436-HAI100TR-qr_only.png?amount=${depositAmount || 0}&addInfo=NAP${profile?.telegramId || '6632274262'}&accountName=NGUYEN%20HOANG%20HAI`}
                 alt="Mã QR Vietcombank"
                 className="bunny-qr-code-overlay"
               />
               <div className="bunny-qr-amount-overlay">
-                {depositAmount.toLocaleString('vi-VN')}đ
+                {(depositAmount || 0).toLocaleString('vi-VN')}đ
               </div>
             </div>
 
             {/* Thông tin chuyển khoản */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
               <div className="copy-row">
                 <div>
                   <span style={{ fontSize: 11, color: 'var(--text-dim)', display: 'block' }}>NGÂN HÀNG</span>
@@ -2447,11 +2547,11 @@ export default function App() {
               <div className="copy-row">
                 <div>
                   <span style={{ fontSize: 11, color: 'var(--text-dim)', display: 'block' }}>SỐ TÀI KHOẢN</span>
-                  <code>{bankConfig.accountNo || 'HAI100TR'}</code>
+                  <code style={{ fontSize: 15, color: '#38bdf8' }}>{bankConfig.accountNo || 'HAI100TR'}</code>
                 </div>
                 <button
                   className="btn-buy-circle"
-                  onClick={() => copyToClipboard(bankConfig.accountNo || 'HAI100TR', 'Đã copy STK!')}
+                  onClick={() => copyToClipboard(bankConfig.accountNo || 'HAI100TR', 'Đã copy STK Vietcombank!')}
                 >
                   <Copy size={14} />
                 </button>
@@ -2464,12 +2564,12 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="copy-row" style={{ border: '1px solid var(--primary)' }}>
+              <div className="copy-row" style={{ border: '1.5px solid var(--primary)', background: 'rgba(168, 85, 247, 0.08)' }}>
                 <div>
                   <span style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 700, display: 'block' }}>
-                    NỘI DUNG CK (BẮT BUỘC ĐÚNG)
+                    NỘI DUNG CK (BẮT BUỘC ĐÚNG ĐỂ AUTO CỘNG TIỀN)
                   </span>
-                  <code style={{ fontSize: 16 }}>NAP{profile?.telegramId || '6632274262'}</code>
+                  <code style={{ fontSize: 16, color: '#facc15', fontWeight: 800 }}>NAP{profile?.telegramId || '6632274262'}</code>
                 </div>
                 <button
                   className="btn-buy-circle"
@@ -2482,21 +2582,191 @@ export default function App() {
               </div>
             </div>
 
-            <button
-              className="btn-primary-pill"
-              onClick={() => {
-                const botName = botUsername || 'tainguyenhai1110_bot';
-                const link = `https://t.me/${botName}?start=nap_${depositAmount}`;
-                if (window.Telegram?.WebApp?.openTelegramLink) {
-                  window.Telegram.WebApp.openTelegramLink(link);
-                } else {
-                  window.open(link, '_blank');
-                }
-              }}
-            >
-              Mở Bot xác nhận nạp tiền tự động
-            </button>
+            {/* Các nút thao tác nạp tiền ngay trên web */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 14 }}>
+              <button
+                className="btn-primary-pill"
+                disabled={depositChecking}
+                onClick={handleCheckDeposit}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  fontSize: 14,
+                  padding: '13px',
+                  background: 'linear-gradient(135deg, #a855f7 0%, #6b21a8 100%)',
+                  boxShadow: '0 4px 18px rgba(168, 85, 247, 0.4)'
+                }}
+              >
+                {depositChecking ? (
+                  <>
+                    <RefreshCw size={16} className="spin-fast" /> Đang kiểm tra giao dịch nạp...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw size={16} /> 🔄 Tôi Đã Chuyển Khoản (Kiểm Tra Số Dư)
+                  </>
+                )}
+              </button>
+
+              <button
+                className="btn-secondary-pill"
+                onClick={() => {
+                  const botName = botUsername || 'tainguyenhai1110_bot';
+                  const link = `https://t.me/${botName}?start=nap_${depositAmount}`;
+                  if (window.Telegram?.WebApp?.openTelegramLink) {
+                    window.Telegram.WebApp.openTelegramLink(link);
+                  } else {
+                    window.open(link, '_blank');
+                  }
+                }}
+                style={{ width: '100%', fontSize: 12.5, padding: '10px' }}
+              >
+                <Send size={14} /> Hoặc Mở Bot Để Tự Động Duyệt
+              </button>
+            </div>
           </div>
+        </div>
+      )}
+
+      {/* ========================================================
+          MODAL XÁC NHẬN MUA HÀNG (BẠN CÓ CHẮC CHẮN MUỐN MUA?)
+      ======================================================== */}
+      {confirmBuyProduct && (
+        <div className="modal-overlay" onClick={() => !isPurchasing && setConfirmBuyProduct(null)}>
+          <div className="modal-sheet" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 440 }}>
+            <div className="modal-header">
+              <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--primary)' }}>
+                <Sparkles size={18} /> Xác Nhận Mua Hàng
+              </h3>
+              {!isPurchasing && (
+                <button className="modal-close-btn" onClick={() => setConfirmBuyProduct(null)}>
+                  <X size={18} />
+                </button>
+              )}
+            </div>
+
+            <div style={{ textAlign: 'center', padding: '10px 0 16px' }}>
+              <div
+                style={{
+                  width: 72,
+                  height: 72,
+                  borderRadius: 20,
+                  margin: '0 auto 12px',
+                  background: 'radial-gradient(circle, #2a1240 0%, #12071f 100%)',
+                  border: '1.5px solid var(--primary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 0 20px rgba(168, 85, 247, 0.35)'
+                }}
+              >
+                <img
+                  src={confirmBuyProduct.imageUrl || './icons/star.svg'}
+                  alt={confirmBuyProduct.name}
+                  onError={(e) => {
+                    const target = e.currentTarget as HTMLImageElement;
+                    target.onerror = null;
+                    target.src = './icons/star.svg';
+                  }}
+                  style={{ width: 44, height: 44, objectFit: 'contain' }}
+                />
+              </div>
+
+              <h4 style={{ fontSize: 16, fontWeight: 800, color: '#fff', marginBottom: 6 }}>
+                {confirmBuyProduct.name}
+              </h4>
+              <p style={{ fontSize: 13, color: 'var(--text-sub)', margin: 0 }}>
+                Bạn có chắc chắn muốn mua sản phẩm này không?
+              </p>
+            </div>
+
+            {/* Bảng tính giá và số dư */}
+            <div style={{ background: 'var(--bg-card-elevated)', borderRadius: 14, padding: 14, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 12.5, color: 'var(--text-dim)' }}>Giá thanh toán:</span>
+                <b style={{ fontSize: 15, color: 'var(--primary)' }}>
+                  {Number(confirmBuyProduct.salePrice ?? confirmBuyProduct.price).toLocaleString('vi-VN')} đ
+                </b>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 12.5, color: 'var(--text-dim)' }}>Số dư trong ví:</span>
+                <span style={{ fontSize: 13.5, color: '#fff', fontWeight: 600 }}>
+                  {profile.balance.toLocaleString('vi-VN')} đ
+                </span>
+              </div>
+
+              <div style={{ height: 1, background: 'var(--border)' }} />
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 12.5, color: 'var(--text-dim)' }}>Số dư còn lại:</span>
+                <b style={{ fontSize: 14, color: (profile.balance - Number(confirmBuyProduct.salePrice ?? confirmBuyProduct.price)) >= 0 ? '#34d399' : '#ef4444' }}>
+                  {(profile.balance - Number(confirmBuyProduct.salePrice ?? confirmBuyProduct.price)).toLocaleString('vi-VN')} đ
+                </b>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 16 }}>
+              <button
+                className="btn-secondary-pill"
+                disabled={isPurchasing}
+                onClick={() => setConfirmBuyProduct(null)}
+                style={{ width: '100%', fontSize: 13, padding: '12px' }}
+              >
+                Huỷ Bỏ
+              </button>
+              <button
+                className="btn-primary-pill"
+                disabled={isPurchasing}
+                onClick={() => executeBuyProduct(confirmBuyProduct)}
+                style={{ width: '100%', fontSize: 13, padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+              >
+                {isPurchasing ? (
+                  <>
+                    <RefreshCw size={15} className="spin-fast" /> Đang Xử Lý...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 size={16} /> Tôi Chắc Chắn Mua
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================
+          HIỆU ỨNG PHÁO HOA ĂN MỪNG MUA HÀNG (CONFETTI)
+      ======================================================== */}
+      {showConfetti && (
+        <div className="confetti-overlay">
+          {Array.from({ length: 48 }).map((_, i) => {
+            const colors = ['#a855f7', '#c084fc', '#e879f9', '#f43f5e', '#38bdf8', '#fbbf24', '#34d399', '#ffffff'];
+            const bg = colors[i % colors.length];
+            const left = `${(i * 2.1) + (Math.sin(i) * 5 + 3)}%`;
+            const animDelay = `${(i % 12) * 0.15}s`;
+            const animDuration = `${2.2 + (i % 5) * 0.4}s`;
+            const width = 8 + (i % 6) * 2;
+            const height = 12 + (i % 5) * 3;
+            return (
+              <div
+                key={i}
+                className="confetti-piece"
+                style={{
+                  left,
+                  backgroundColor: bg,
+                  animationDelay: animDelay,
+                  animationDuration: animDuration,
+                  width: `${width}px`,
+                  height: `${height}px`
+                }}
+              />
+            );
+          })}
         </div>
       )}
 
@@ -2513,7 +2783,7 @@ export default function App() {
               </button>
             </div>
 
-            <div className="product-thumb-wrap" style={{ aspectRatio: '16/9', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle, #240b17 0%, #0c0409 100%)', borderRadius: 16, overflow: 'hidden' }}>
+            <div className="product-thumb-wrap" style={{ aspectRatio: '16/9', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle, #1a0928 0%, #0c0409 100%)', borderRadius: 16, overflow: 'hidden' }}>
               <img
                 src={productModal.imageUrl || './icons/star.svg'}
                 alt={productModal.name}
@@ -2584,12 +2854,12 @@ export default function App() {
                   height: 140,
                   borderRadius: '50%',
                   margin: '0 auto',
-                  background: 'linear-gradient(135deg, #ff2453, #7c3aed)',
+                  background: 'linear-gradient(135deg, #a855f7, #7c3aed)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: 54,
-                  boxShadow: '0 0 35px rgba(255, 36, 83, 0.5)',
+                  boxShadow: '0 0 35px rgba(168, 85, 247, 0.5)',
                   transform: spinning ? 'rotate(1080deg)' : 'none',
                   transition: 'transform 1.8s cubic-bezier(0.16, 1, 0.3, 1)'
                 }}
@@ -2643,14 +2913,14 @@ export default function App() {
                 gap: 8,
                 padding: '11px 14px',
                 borderRadius: 12,
-                background: 'linear-gradient(135deg, rgba(255, 36, 83, 0.22) 0%, rgba(255, 36, 83, 0.08) 100%)',
-                border: '1px solid rgba(255, 36, 83, 0.4)',
+                background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.22) 0%, rgba(168, 85, 247, 0.08) 100%)',
+                border: '1px solid rgba(168, 85, 247, 0.4)',
                 color: '#fff',
                 textDecoration: 'none',
                 fontWeight: 700,
                 fontSize: 12.5,
                 margin: '8px 16px 12px 16px',
-                boxShadow: '0 4px 14px rgba(255, 36, 83, 0.2)'
+                boxShadow: '0 4px 14px rgba(168, 85, 247, 0.2)'
               }}
             >
               <ExternalLink size={15} color="var(--primary)" />

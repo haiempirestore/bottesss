@@ -73,13 +73,17 @@ declare global {
 
 const isLocalhost = typeof window !== 'undefined' && (
   window.location.hostname === 'localhost' ||
-  window.location.hostname === '127.0.0.1'
+  window.location.hostname === '127.0.0.1' ||
+  window.location.port === '4000'
 );
 
 function getDefaultApi(): string {
-  if (typeof window === 'undefined') return '';
+  if (typeof window === 'undefined') return 'http://localhost:4000';
+  if (isLocalhost) return window.location.origin || 'http://localhost:4000';
+  if (window.location.protocol.startsWith('http') && window.location.hostname !== 'haiempirestore.github.io') {
+    return window.location.origin;
+  }
   if (window.__API_URL__) return window.__API_URL__;
-  if (isLocalhost) return 'http://localhost:4000';
   return 'http://localhost:4000';
 }
 
@@ -91,9 +95,14 @@ export default function AdminApp() {
   const [inputKey, setInputKey] = useState('');
   const [loginError, setLoginError] = useState('');
 
-  // API Url config
+  // API Url config: Luôn ưu tiên kết nối trực tiếp cổng 4000 khi chạy local
   const [apiUrl, setApiUrl] = useState<string>(() => {
-    return localStorage.getItem('HAI1110_API_URL') || getDefaultApi();
+    if (isLocalhost || (typeof window !== 'undefined' && window.location.port === '4000')) {
+      return window.location.origin || 'http://localhost:4000';
+    }
+    const saved = localStorage.getItem('HAI1110_API_URL');
+    if (saved && (saved.startsWith('http://') || saved.startsWith('https://'))) return saved;
+    return getDefaultApi();
   });
   const [showApiModal, setShowApiModal] = useState(false);
   const [tempApiUrl, setTempApiUrl] = useState(apiUrl);
@@ -234,13 +243,18 @@ export default function AdminApp() {
           setCategories(Array.from(catMap.values()));
         }
       } else {
-        // If 401 or null and we have no stored key verification
-        if (!overrideKey && adminKey) {
-          // Keep key, but maybe API offline
+        if (isLocalhost && apiUrl !== 'http://localhost:4000') {
+          // Tự động kết nối lại cổng 4000 nếu URL cũ bị ngắt
+          setApiUrl('http://localhost:4000');
+          localStorage.removeItem('HAI1110_API_URL');
         }
       }
     } catch (e) {
       console.error('Fetch admin error:', e);
+      if (isLocalhost && apiUrl !== 'http://localhost:4000') {
+        setApiUrl('http://localhost:4000');
+        localStorage.removeItem('HAI1110_API_URL');
+      }
     } finally {
       setLoading(false);
     }
@@ -730,29 +744,29 @@ export default function AdminApp() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'radial-gradient(circle at 50% 20%, #200814 0%, #080306 100%)',
+        background: 'radial-gradient(circle at 50% 20%, #160829 0%, #080306 100%)',
         padding: '20px'
       }}>
         <div style={{
           width: '100%',
           maxWidth: '420px',
-          background: '#12050e',
-          border: '1px solid rgba(255, 36, 83, 0.3)',
+          background: '#140926',
+          border: '1px solid rgba(168, 85, 247, 0.3)',
           borderRadius: '24px',
           padding: '36px 32px',
-          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(255, 36, 83, 0.2)',
+          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(168, 85, 247, 0.2)',
           textAlign: 'center'
         }}>
           <div style={{
             width: '64px',
             height: '64px',
             borderRadius: '18px',
-            background: 'linear-gradient(135deg, #ff2453 0%, #900a29 100%)',
+            background: 'linear-gradient(135deg, #a855f7 0%, #581c87 100%)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             margin: '0 auto 20px auto',
-            boxShadow: '0 0 25px rgba(255, 36, 83, 0.4)'
+            boxShadow: '0 0 25px rgba(168, 85, 247, 0.4)'
           }}>
             <Lock size={32} color="#fff" />
           </div>
@@ -761,7 +775,7 @@ export default function AdminApp() {
 
           <form onSubmit={handleLogin}>
             <div style={{ textAlign: 'left', marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#ff2453', marginBottom: '6px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#a855f7', marginBottom: '6px' }}>
                 MẬT KHẨU / ADMIN KEY
               </label>
               <input
@@ -774,7 +788,7 @@ export default function AdminApp() {
                   padding: '12px 16px',
                   borderRadius: '12px',
                   background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 36, 83, 0.3)',
+                  border: '1px solid rgba(168, 85, 247, 0.3)',
                   color: '#fff',
                   fontSize: '14px',
                   outline: 'none'
@@ -1062,10 +1076,10 @@ export default function AdminApp() {
                   <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#fff', marginBottom: '4px' }}>⚡ Thao tác nhanh quản trị</h3>
                   <p style={{ fontSize: '13px', color: '#94a3b8' }}>Đồng bộ Mini App, gửi thông báo bot hoặc cấp đơn hàng ngay lập tức</p>
                 </div>
-                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                  <button onClick={handleSyncGithub} className="btn-admin btn-admin-success">
-                    <Download size={15} /> Đồng bộ GitHub Pages
-                  </button>
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <span className="admin-pill-badge" style={{ color: '#c084fc', background: 'rgba(168, 85, 247, 0.15)', border: '1px solid rgba(168, 85, 247, 0.3)' }}>
+                    ⚡ Tự động cập nhật GitHub Pages A-Z
+                  </span>
                   <button onClick={() => { setActiveTab('bot'); }} className="btn-admin btn-admin-secondary">
                     <Megaphone size={15} /> Bắn thông báo Bot
                   </button>
@@ -1098,7 +1112,7 @@ export default function AdminApp() {
                     <tbody>
                       {orders.slice(0, 5).map(o => (
                         <tr key={o.id}>
-                          <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#ff2453' }}>#{o.code}</td>
+                          <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#a855f7' }}>#{o.code}</td>
                           <td>
                             <div style={{ fontWeight: 600 }}>{o.user?.firstName || 'Khách'}</div>
                             <div style={{ fontSize: '11px', color: '#64748b' }}>ID: {o.user?.telegramId}</div>
@@ -1142,9 +1156,9 @@ export default function AdminApp() {
                 </div>
 
                 <div className="admin-actions-bar">
-                  <button onClick={handleSyncGithub} className="btn-admin btn-admin-success btn-admin-sm">
-                    <Download size={14} /> Xuất GitHub Pages
-                  </button>
+                  <span className="admin-pill-badge" style={{ color: '#c084fc', background: 'rgba(168, 85, 247, 0.15)', border: '1px solid rgba(168, 85, 247, 0.3)' }}>
+                    ⚡ Tự động lưu lên Bot & GitHub
+                  </span>
                   <button
                     onClick={() => {
                       setEditingCategory(null);
@@ -1200,8 +1214,8 @@ export default function AdminApp() {
                             borderRadius: '6px',
                             fontSize: '11.5px',
                             fontWeight: 700,
-                            background: 'rgba(255, 36, 83, 0.12)',
-                            color: '#ff4772'
+                            background: 'rgba(168, 85, 247, 0.12)',
+                            color: '#c084fc'
                           }}>
                             <ShoppingBag size={12} /> {prodCount} SP
                           </span>
@@ -1273,7 +1287,7 @@ export default function AdminApp() {
                     <Filter size={15} color="#94a3b8" />
                     <select
                       className="admin-form-control"
-                      style={{ padding: '8px 12px', fontSize: '13px', width: 'auto', background: '#180713', color: '#fff' }}
+                      style={{ padding: '8px 12px', fontSize: '13px', width: 'auto', background: '#160926', color: '#fff' }}
                       value={selectedCategoryFilter}
                       onChange={e => setSelectedCategoryFilter(e.target.value)}
                     >
@@ -1291,9 +1305,9 @@ export default function AdminApp() {
                 </div>
 
                 <div className="admin-actions-bar">
-                  <button onClick={handleSyncGithub} className="btn-admin btn-admin-success btn-admin-sm">
-                    <Download size={14} /> Xuất GitHub Pages
-                  </button>
+                  <span className="admin-pill-badge" style={{ color: '#c084fc', background: 'rgba(168, 85, 247, 0.15)', border: '1px solid rgba(168, 85, 247, 0.3)' }}>
+                    ⚡ Tự động lưu lên Bot & GitHub
+                  </span>
                   <button
                     onClick={() => {
                       setEditingProduct(null);
@@ -1340,7 +1354,7 @@ export default function AdminApp() {
                                   src={p.imageUrl || './icons/star.svg'}
                                   alt=""
                                   onError={e => { (e.currentTarget as HTMLImageElement).src = './icons/star.svg'; }}
-                                  style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'contain', background: '#180713', padding: '3px', border: '1px solid rgba(255, 36, 83, 0.2)' }}
+                                  style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'contain', background: '#160926', padding: '3px', border: '1px solid rgba(168, 85, 247, 0.2)' }}
                                 />
                                 <div>
                                   <div style={{ fontWeight: 700, color: '#fff' }}>{p.name}</div>
@@ -1356,7 +1370,7 @@ export default function AdminApp() {
                               </span>
                             </td>
                             <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{p.price.toLocaleString('vi-VN')}đ</td>
-                            <td style={{ fontFamily: 'var(--font-mono)', color: p.salePrice ? '#ff2453' : '#64748b' }}>
+                            <td style={{ fontFamily: 'var(--font-mono)', color: p.salePrice ? '#a855f7' : '#64748b' }}>
                               {p.salePrice ? `${p.salePrice.toLocaleString('vi-VN')}đ` : '—'}
                             </td>
                             <td>
@@ -1487,7 +1501,7 @@ export default function AdminApp() {
                 <div className="admin-card">
                   <div className="admin-card-header">
                     <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Megaphone size={18} color="#ff2453" /> Bắn Thông Báo Toàn Bộ Người Dùng
+                      <Megaphone size={18} color="#a855f7" /> Bắn Thông Báo Toàn Bộ Người Dùng
                     </h3>
                   </div>
                   <div className="admin-card-body" style={{ padding: '20px' }}>
@@ -1658,13 +1672,13 @@ export default function AdminApp() {
                                 width: '36px',
                                 height: '36px',
                                 borderRadius: '10px',
-                                background: 'linear-gradient(135deg, #ff2453 0%, #15060c 100%)',
+                                background: 'linear-gradient(135deg, #a855f7 0%, #15060c 100%)',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 fontWeight: 800,
-                                color: '#ff2453',
-                                border: '1px solid rgba(255, 36, 83, 0.3)'
+                                color: '#a855f7',
+                                border: '1px solid rgba(168, 85, 247, 0.3)'
                               }}>
                                 {(u.firstName || 'K').charAt(0).toUpperCase()}
                               </div>
@@ -1816,7 +1830,7 @@ export default function AdminApp() {
                         const deliveredKey = o.items?.[0]?.delivered;
                         return (
                           <tr key={o.id}>
-                            <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#ff2453' }}>
+                            <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#a855f7' }}>
                               #{o.code}
                             </td>
                             <td>
@@ -1963,13 +1977,13 @@ export default function AdminApp() {
                       </label>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '12px' }}>
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                       <button type="submit" className="btn-admin btn-admin-primary">
                         Lưu Cấu Hình
                       </button>
-                      <button type="button" onClick={handleSyncGithub} className="btn-admin btn-admin-success">
-                        <Download size={15} /> Đồng bộ sang GitHub Pages
-                      </button>
+                      <span className="admin-pill-badge" style={{ color: '#c084fc', background: 'rgba(168, 85, 247, 0.15)', border: '1px solid rgba(168, 85, 247, 0.3)' }}>
+                        ⚡ Tự động cập nhật Mini App & Bot
+                      </span>
                     </div>
                   </form>
                 </div>
@@ -1999,7 +2013,7 @@ export default function AdminApp() {
                         onError={e => { (e.currentTarget as HTMLImageElement).src = './icons/star.svg'; }}
                       />
                     ) : (
-                      <Layers size={30} color="#ff2453" />
+                      <Layers size={30} color="#a855f7" />
                     )}
                   </div>
                   <div className="image-preview-meta" style={{ flex: 1 }}>
@@ -2089,7 +2103,7 @@ export default function AdminApp() {
                   {/* Magnific Icons Picker */}
                   <div style={{ marginTop: '8px' }}>
                     <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Sparkles size={13} color="#ff2453" /> Thư viện Icon Website Bản Quyền (Magnific Icons):
+                      <Sparkles size={13} color="#a855f7" /> Thư viện Icon Website Bản Quyền (Magnific Icons):
                     </div>
                     <div className="icon-picker-grid">
                       {MAGNIFIC_ICONS.map(item => {
@@ -2145,14 +2159,14 @@ export default function AdminApp() {
                         onError={e => { (e.currentTarget as HTMLImageElement).src = './icons/star.svg'; }}
                       />
                     ) : (
-                      <ImageIcon size={30} color="#ff2453" />
+                      <ImageIcon size={30} color="#a855f7" />
                     )}
                   </div>
                   <div className="image-preview-meta" style={{ flex: 1 }}>
                     <h4>{productForm.name || 'Tên sản phẩm xem trước'}</h4>
                     <p>
                       {categories.find(c => c.id === productForm.categoryId)?.name || 'Chung'} •{' '}
-                      <strong style={{ color: '#ff2453' }}>{Number(productForm.price || 0).toLocaleString('vi-VN')}đ</strong>
+                      <strong style={{ color: '#a855f7' }}>{Number(productForm.price || 0).toLocaleString('vi-VN')}đ</strong>
                       {productForm.salePrice ? ` (Sale: ${Number(productForm.salePrice).toLocaleString('vi-VN')}đ)` : ''}
                     </p>
                     <div style={{ fontSize: '11px', color: '#64748b', marginTop: '3px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '380px' }}>
@@ -2242,7 +2256,7 @@ export default function AdminApp() {
                   {/* Magnific Website Icons library */}
                   <div style={{ marginTop: '8px' }}>
                     <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Sparkles size={13} color="#ff2453" /> Thư viện Icon Website Bản Quyền (Magnific Icons - Bấm để chọn):
+                      <Sparkles size={13} color="#a855f7" /> Thư viện Icon Website Bản Quyền (Magnific Icons - Bấm để chọn):
                     </div>
                     <div className="icon-picker-grid">
                       {MAGNIFIC_ICONS.map(item => {
@@ -2271,7 +2285,7 @@ export default function AdminApp() {
                     <div style={{ display: 'flex', gap: '6px' }}>
                       <button
                         type="button"
-                        style={{ fontSize: '11px', background: 'rgba(255, 36, 83, 0.1)', border: 'none', color: '#ff4772', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer' }}
+                        style={{ fontSize: '11px', background: 'rgba(168, 85, 247, 0.1)', border: 'none', color: '#c084fc', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer' }}
                         onClick={() => setProductForm(prev => ({
                           ...prev,
                           description: (prev.description ? prev.description + '\n' : '') + '🛡️ Bảo hành 1 đổi 1 trong suốt thời gian sử dụng.\n⚡ Giao tài khoản tự động ngay sau khi thanh toán.'
@@ -2349,7 +2363,7 @@ export default function AdminApp() {
                 onChange={e => setStockModal(prev => ({ ...prev, keysText: e.target.value }))}
                 style={{ fontFamily: 'var(--font-mono)', fontSize: '13px' }}
               />
-              <div style={{ marginTop: '8px', fontSize: '12px', color: '#ff2453', fontWeight: 600 }}>
+              <div style={{ marginTop: '8px', fontSize: '12px', color: '#a855f7', fontWeight: 600 }}>
                 Tổng số dòng phát hiện: {stockModal.keysText.split('\n').filter(s => s.trim().length > 0).length} key
               </div>
             </div>
@@ -2390,7 +2404,7 @@ export default function AdminApp() {
                         padding: '10px 14px',
                         borderRadius: '8px',
                         background: 'rgba(255, 255, 255, 0.03)',
-                        border: '1px solid rgba(255, 36, 83, 0.1)'
+                        border: '1px solid rgba(168, 85, 247, 0.1)'
                       }}
                     >
                       <div style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', color: '#38bdf8', wordBreak: 'break-all' }}>

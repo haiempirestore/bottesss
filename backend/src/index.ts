@@ -14,7 +14,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { spawn } from 'node:child_process';
+import { spawn, exec } from 'node:child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -22,6 +22,18 @@ const frontendDist = path.resolve(__dirname, '../../frontend/dist');
 let cachedBannerFileId: string | null = 'AgACAgUAAxkDAAONaujxZ7AYxVLdS8BsRlpbQy7PjHgAArEVaxvpqUlXhMkMVAy8jvYBAAMCAAN5AAM9BA';
 let isBotRunning = false;
 let activeTunnelUrl = '';
+
+let gitPushTimeout: NodeJS.Timeout | null = null;
+function scheduleGithubSync() {
+  if (gitPushTimeout) clearTimeout(gitPushTimeout);
+  gitPushTimeout = setTimeout(() => {
+    const cmd = 'git add githubpage && (git diff --cached --quiet || git commit -m "Auto sync GitHub Pages from bot/admin [skip ci]") && git branch -D gh-pages-temp 2>/dev/null; git subtree split --prefix githubpage -b gh-pages-temp && git push -f origin gh-pages-temp:main && git branch -D gh-pages-temp';
+    exec(cmd, { cwd: path.resolve(__dirname, '../..') }, (err) => {
+      if (err) console.error('Auto git push notice:', err.message);
+      else console.log('🚀 [TỰ ĐỘNG CẬP NHẬT GITHUB PAGES TỪ A->Z THÀNH CÔNG]');
+    });
+  }, 4000);
+}
 
 function startAutoTunnel() {
   if (process.env.DISABLE_AUTO_TUNNEL === 'true') return;
@@ -45,6 +57,16 @@ function startAutoTunnel() {
         const s = loadStoreSettings();
         s.apiPublicUrl = url;
         saveStoreSettings(s);
+
+        // Tự động ghi config.js để Mini App trên GitHub Pages luôn nhận đúng API mới nhất
+        const configContent = `// Cấu hình URL Backend API cho Mini App Shop Hai1110#\nwindow.__API_URL__ = "${url}";\n`;
+        const p1 = path.resolve(__dirname, '../../frontend/public/config.js');
+        const p2 = path.resolve(__dirname, '../../frontend/dist/config.js');
+        const p3 = path.resolve(__dirname, '../../githubpage/config.js');
+        try { fs.writeFileSync(p1, configContent, 'utf-8'); } catch {}
+        try { fs.writeFileSync(p2, configContent, 'utf-8'); } catch {}
+        try { fs.writeFileSync(p3, configContent, 'utf-8'); } catch {}
+        scheduleGithubSync();
       }
     };
 
@@ -854,6 +876,7 @@ async function exportGithubProducts() {
     await fs.writeFile(path.resolve(__dirname, '../../frontend/public/products.json'), JSON.stringify(data, null, 2)).catch(() => {});
     await fs.writeFile(path.resolve(__dirname, '../../frontend/dist/products.json'), JSON.stringify(data, null, 2)).catch(() => {});
     await fs.writeFile(path.resolve(__dirname, '../../githubpage/products.json'), JSON.stringify(data, null, 2)).catch(() => {});
+    scheduleGithubSync();
     return true;
   } catch (err) {
     console.error('Lỗi exportGithubProducts:', err);

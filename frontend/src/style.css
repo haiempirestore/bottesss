@@ -1,22 +1,22 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700;800&display=swap');
 
 :root {
-  --bg-app: #080306;
-  --bg-card: #140a0f;
-  --bg-card-elevated: #1a0d14;
-  --bg-input: #12080d;
-  --border: rgba(255, 36, 83, 0.14);
-  --border-strong: rgba(255, 36, 83, 0.28);
-  --primary: #ff2453;
-  --primary-dark: #d80b38;
-  --primary-gradient: linear-gradient(135deg, #ff2453 0%, #d80b38 100%);
-  --primary-glow: 0 4px 22px rgba(255, 36, 83, 0.45);
+  --bg-app: #090412;
+  --bg-card: #130924;
+  --bg-card-elevated: #1c0d32;
+  --bg-input: #150a26;
+  --border: rgba(168, 85, 247, 0.14);
+  --border-strong: rgba(168, 85, 247, 0.28);
+  --primary: #a855f7;
+  --primary-dark: #7e22ce;
+  --primary-gradient: linear-gradient(135deg, #a855f7 0%, #7e22ce 100%);
+  --primary-glow: 0 4px 22px rgba(168, 85, 247, 0.45);
   --gold: #f59e0b;
   --gold-glow: 0 0 15px rgba(245, 158, 11, 0.35);
   --green: #10b981;
   --text-main: #ffffff;
-  --text-sub: #b3a4ab;
-  --text-dim: #73646c;
+  --text-sub: #c4b5fd;
+  --text-dim: #8b7ca6;
   --font-main: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   --font-display: 'Space Grotesk', system-ui, sans-serif;
   --bottom-nav-height: 68px;
@@ -36,9 +36,9 @@ body {
   min-height: 100vh;
   display: flex;
   justify-content: center;
-  background-image: radial-gradient(circle at 50% -10%, rgba(255, 36, 83, 0.18) 0%, transparent 60%),
-                    radial-gradient(circle at 100% 40%, rgba(224, 11, 63, 0.08) 0%, transparent 40%),
-                    radial-gradient(circle at 0% 80%, rgba(180, 5, 45, 0.06) 0%, transparent 40%);
+  background-image: radial-gradient(circle at 50% -10%, rgba(168, 85, 247, 0.18) 0%, transparent 60%),
+                    radial-gradient(circle at 100% 40%, rgba(147, 51, 234, 0.08) 0%, transparent 40%),
+                    radial-gradient(circle at 0% 80%, rgba(107, 33, 168, 0.06) 0%, transparent 40%);
   background-attachment: fixed;
   overflow-x: hidden;
 }
@@ -51,8 +51,8 @@ body {
   flex-direction: column;
   position: relative;
   background-color: var(--bg-app);
-  border-left: 1px solid rgba(255, 36, 83, 0.08);
-  border-right: 1px solid rgba(255, 36, 83, 0.08);
+  border-left: 1px solid rgba(168, 85, 247, 0.08);
+  border-right: 1px solid rgba(168, 85, 247, 0.08);
 }
 
 /* Scrollbar */
@@ -61,11 +61,44 @@ body {
   height: 4px;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 36, 83, 0.25);
+  background: rgba(168, 85, 247, 0.25);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
+}
+
+/* ============================================================
+   CONFETTI PURCHASE ANIMATION & CELEBRATION
+   ============================================================ */
+.confetti-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 99999;
+  overflow: hidden;
+}
+
+.confetti-piece {
+  position: absolute;
+  top: -20px;
+  border-radius: 3px;
+  opacity: 0.95;
+  animation: confettiDrop 3.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+@keyframes confettiDrop {
+  0% {
+    transform: translateY(0) rotate(0deg) scale(1);
+    opacity: 1;
+  }
+  75% {
+    opacity: 0.95;
+  }
+  100% {
+    transform: translateY(110vh) rotate(720deg) scale(0.6);
+    opacity: 0;
+  }
 }
 
 /* App Header */
@@ -94,12 +127,12 @@ body {
   height: 38px;
   border-radius: 12px;
   background: linear-gradient(135deg, #2b0e17 0%, #17070d 100%);
-  border: 1px solid rgba(255, 36, 83, 0.4);
+  border: 1px solid rgba(168, 85, 247, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--primary);
-  box-shadow: 0 0 14px rgba(255, 36, 83, 0.25);
+  box-shadow: 0 0 14px rgba(168, 85, 247, 0.25);
 }
 
 .brand-text {
@@ -170,7 +203,7 @@ body {
   height: 36px;
   border-radius: 50%;
   border: 2px solid var(--primary);
-  box-shadow: 0 0 10px rgba(255, 36, 83, 0.35);
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.35);
   overflow: hidden;
   cursor: pointer;
 }
@@ -249,7 +282,7 @@ body {
   border: 1px solid var(--border-strong);
   border-radius: 20px;
   padding: 20px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 36, 83, 0.15);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(168, 85, 247, 0.15);
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -264,7 +297,7 @@ body {
   right: -40px;
   width: 120px;
   height: 120px;
-  background: radial-gradient(circle, rgba(255, 36, 83, 0.22) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(168, 85, 247, 0.22) 0%, transparent 70%);
   pointer-events: none;
 }
 
@@ -275,8 +308,8 @@ body {
 }
 
 .currency-toggle {
-  background: rgba(255, 36, 83, 0.12);
-  border: 1px solid rgba(255, 36, 83, 0.25);
+  background: rgba(168, 85, 247, 0.12);
+  border: 1px solid rgba(168, 85, 247, 0.25);
   color: #ffffff;
   padding: 4px 10px;
   border-radius: 20px;
@@ -290,7 +323,7 @@ body {
 }
 
 .currency-toggle:hover {
-  background: rgba(255, 36, 83, 0.22);
+  background: rgba(168, 85, 247, 0.22);
 }
 
 .wallet-balance-row {
@@ -385,8 +418,8 @@ body {
   width: 38px;
   height: 38px;
   border-radius: 12px;
-  background: rgba(255, 36, 83, 0.1);
-  border: 1px solid rgba(255, 36, 83, 0.2);
+  background: rgba(168, 85, 247, 0.1);
+  border: 1px solid rgba(168, 85, 247, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -424,7 +457,7 @@ body {
   font-weight: 800;
   padding: 2px 7px;
   border-radius: 10px;
-  box-shadow: 0 0 10px rgba(255, 36, 83, 0.4);
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.4);
 }
 
 .badge-dim {
@@ -491,7 +524,7 @@ body {
 
 .search-input:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 12px rgba(255, 36, 83, 0.25);
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.25);
 }
 
 /* Category Filter Chips Horizontal */
@@ -575,7 +608,7 @@ body {
   border-radius: 12px;
   overflow: hidden;
   background: linear-gradient(135deg, #1f0b14 0%, #10060a 100%);
-  border: 1px solid rgba(255, 36, 83, 0.12);
+  border: 1px solid rgba(168, 85, 247, 0.12);
   position: relative;
   display: flex;
   align-items: center;
@@ -705,9 +738,9 @@ body {
 }
 
 .stat-icon.check {
-  background: rgba(255, 36, 83, 0.12);
+  background: rgba(168, 85, 247, 0.12);
   color: var(--primary);
-  border: 1px solid rgba(255, 36, 83, 0.25);
+  border: 1px solid rgba(168, 85, 247, 0.25);
 }
 
 .stat-icon.shield {
@@ -737,7 +770,7 @@ body {
 .orders-filter-row {
   display: flex;
   gap: 8px;
-  background: rgba(255, 36, 83, 0.05);
+  background: rgba(168, 85, 247, 0.05);
   padding: 4px;
   border-radius: 14px;
   border: 1px solid var(--border);
@@ -761,9 +794,9 @@ body {
 }
 
 .orders-filter-btn.active {
-  background: rgba(255, 36, 83, 0.16);
+  background: rgba(168, 85, 247, 0.16);
   color: var(--primary);
-  border: 1px solid rgba(255, 36, 83, 0.3);
+  border: 1px solid rgba(168, 85, 247, 0.3);
 }
 
 /* Empty State Card */
@@ -784,8 +817,8 @@ body {
   width: 64px;
   height: 64px;
   border-radius: 20px;
-  background: rgba(255, 36, 83, 0.1);
-  border: 1px solid rgba(255, 36, 83, 0.25);
+  background: rgba(168, 85, 247, 0.1);
+  border: 1px solid rgba(168, 85, 247, 0.25);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -839,7 +872,7 @@ body {
   height: 82px;
   border-radius: 50%;
   border: 3px solid var(--primary);
-  box-shadow: 0 0 24px rgba(255, 36, 83, 0.45);
+  box-shadow: 0 0 24px rgba(168, 85, 247, 0.45);
   overflow: hidden;
   position: relative;
 }
@@ -867,8 +900,8 @@ body {
   gap: 6px;
   padding: 6px 16px;
   border-radius: 20px;
-  background: rgba(255, 36, 83, 0.12);
-  border: 1px solid rgba(255, 36, 83, 0.35);
+  background: rgba(168, 85, 247, 0.12);
+  border: 1px solid rgba(168, 85, 247, 0.35);
   color: #ffffff;
   font-size: 11.5px;
   font-weight: 800;
@@ -915,13 +948,13 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  border-top: 1px solid rgba(255, 36, 83, 0.08);
+  border-top: 1px solid rgba(168, 85, 247, 0.08);
   cursor: pointer;
   transition: background 0.15s;
 }
 
 .menu-item:hover {
-  background: rgba(255, 36, 83, 0.05);
+  background: rgba(168, 85, 247, 0.05);
 }
 
 .menu-item-left {
@@ -935,8 +968,8 @@ body {
   width: 38px;
   height: 38px;
   border-radius: 12px;
-  background: rgba(255, 36, 83, 0.1);
-  border: 1px solid rgba(255, 36, 83, 0.2);
+  background: rgba(168, 85, 247, 0.1);
+  border: 1px solid rgba(168, 85, 247, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -980,7 +1013,7 @@ body {
 
 .toggle-switch.on {
   background: var(--primary);
-  box-shadow: 0 0 10px rgba(255, 36, 83, 0.5);
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.5);
 }
 
 .toggle-knob {
@@ -1198,7 +1231,7 @@ body {
   align-items: center;
   justify-content: center;
   margin: 0 auto;
-  box-shadow: 0 0 25px rgba(255, 36, 83, 0.2);
+  box-shadow: 0 0 25px rgba(168, 85, 247, 0.2);
 }
 
 .qr-preview-box img {
@@ -1232,7 +1265,7 @@ body {
   width: 100%;
   max-width: 560px;
   background: #11070c;
-  border: 1px solid rgba(255, 36, 83, 0.3);
+  border: 1px solid rgba(168, 85, 247, 0.3);
   border-radius: 24px 24px 0 0;
   padding: 20px 16px calc(24px + env(safe-area-inset-bottom, 12px));
   max-height: 92vh;
@@ -1240,7 +1273,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  box-shadow: 0 -10px 50px rgba(0, 0, 0, 0.9), 0 0 30px rgba(255, 36, 83, 0.15);
+  box-shadow: 0 -10px 50px rgba(0, 0, 0, 0.9), 0 0 30px rgba(168, 85, 247, 0.15);
   animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -1272,10 +1305,10 @@ body {
 }
 
 .admin-nav-tab.active {
-  background: rgba(255, 36, 83, 0.18);
-  border-color: rgba(255, 36, 83, 0.6);
+  background: rgba(168, 85, 247, 0.18);
+  border-color: rgba(168, 85, 247, 0.6);
   color: #fff;
-  box-shadow: 0 0 12px rgba(255, 36, 83, 0.3);
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.3);
 }
 
 .admin-stats-grid {
@@ -1354,7 +1387,7 @@ body {
 }
 
 .btn-admin-action.primary {
-  background: #ff2453;
+  background: #a855f7;
   color: #fff;
 }
 
