@@ -14,12 +14,54 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spawn } from 'node:child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const frontendDist = path.resolve(__dirname, '../../frontend/dist');
 let cachedBannerFileId: string | null = 'AgACAgUAAxkDAAONaujxZ7AYxVLdS8BsRlpbQy7PjHgAArEVaxvpqUlXhMkMVAy8jvYBAAMCAAN5AAM9BA';
 let isBotRunning = false;
+let activeTunnelUrl = '';
+
+function startAutoTunnel() {
+  if (process.env.DISABLE_AUTO_TUNNEL === 'true') return;
+  console.log('🌐 Đang tự động kết nối Tunnel công khai cho Mini App...');
+  try {
+    const tunnel = spawn('ssh', [
+      '-o', 'StrictHostKeyChecking=no',
+      '-o', 'ServerAliveInterval=15',
+      '-o', 'ServerAliveCountMax=3',
+      '-R', `80:localhost:${port}`,
+      'nokey@localhost.run'
+    ]);
+
+    const handleOutput = (data: Buffer) => {
+      const text = data.toString();
+      const match = text.match(/https:\/\/[a-z0-9]+\.lhr\.life/i);
+      if (match) {
+        const url = match[0];
+        activeTunnelUrl = url;
+        console.log(`🚀 [TUNNEL TỰ ĐỘNG SẴN SÀNG] Mini App Public API: ${url}`);
+        const s = loadStoreSettings();
+        s.apiPublicUrl = url;
+        saveStoreSettings(s);
+      }
+    };
+
+    tunnel.stdout.on('data', handleOutput);
+    tunnel.stderr.on('data', handleOutput);
+
+    tunnel.on('close', (code) => {
+      console.log(`⚠️ Tunnel đã ngắt kết nối (code ${code}), tự động khởi động lại sau 3s...`);
+      setTimeout(startAutoTunnel, 3000);
+    });
+
+    process.once('SIGINT', () => tunnel.kill());
+    process.once('SIGTERM', () => tunnel.kill());
+  } catch (err) {
+    console.error('Lỗi khởi động Tunnel:', err);
+  }
+}
 
 // ============================================================
 // SETTINGS VÀ QUẢN TRỊ TELEGRAM BOT TRÊN TRANG WEB ADMIN RIÊNG
@@ -1586,6 +1628,7 @@ if (botToken) {
     .catch(err => console.error('Lỗi setMyCommands:', err));
 
   function getLiveApiUrl(): string {
+    if (activeTunnelUrl) return activeTunnelUrl;
     const s = loadStoreSettings();
     return (s.apiPublicUrl || process.env.API_PUBLIC_URL || 'https://180761536cc24a.lhr.life').trim();
   }
@@ -3107,7 +3150,10 @@ app.get(['/admin', '/admin.html', '/admin/*'], (_req, res, next) => {
   });
 });
 
-app.listen(port, () => console.log(`API listening on ${port}`));
+app.listen(port, () => {
+  console.log(`API listening on ${port}`);
+  startAutoTunnel();
+});
 process.once('SIGINT', () => {
   isBotRunning = false;
   bot?.stop('SIGINT');

@@ -107,7 +107,7 @@ function getInitialApi(): string {
   if (isLocalhost) return 'http://localhost:4000';
 
   // 5. Fallback URL
-  return 'https://180761536cc24a.lhr.life';
+  return 'https://670586b9f53e6b.lhr.life';
 }
 
 // Trích xuất dữ liệu người dùng thực tế từ Telegram WebApp SDK
@@ -447,7 +447,7 @@ export default function App() {
     }));
 
     // 2. Đồng bộ thời gian thực từ Backend API (localhost hoặc tunnel nếu có)
-    const activeApi = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://180761536cc24a.lhr.life');
+    const activeApi = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://670586b9f53e6b.lhr.life');
     if (effectiveTeleId) {
       fetch(`${activeApi}/api/user/sync?telegramId=${effectiveTeleId}`, {
         method: 'GET',
@@ -594,30 +594,20 @@ export default function App() {
     return false;
   };
 
-  // Đếm ngược tự động đóng Mini App khi bot tắt
+  // Khi ở màn hình tạm đóng: tự động dò tìm tín hiệu và kết nối lại mỗi 3 giây khi Bot bật lại
   useEffect(() => {
     if (botOnline !== false) return;
 
-    window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('error');
+    window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('warning');
 
-    const timer = setInterval(() => {
-      setCloseCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          try {
-            if (window.Telegram?.WebApp?.close) {
-              window.Telegram.WebApp.close();
-            } else if (typeof window !== 'undefined' && window.close) {
-              window.close();
-            }
-          } catch {}
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+    const retryTimer = setInterval(async () => {
+      const ok = await checkBotHealth(true);
+      if (ok) {
+        loadData();
+      }
+    }, 3000);
 
-    return () => clearInterval(timer);
+    return () => clearInterval(retryTimer);
   }, [botOnline]);
 
   // Tải dữ liệu sản phẩm & danh mục từ Backend
@@ -743,7 +733,7 @@ export default function App() {
       return;
     }
 
-    const activeApi = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://180761536cc24a.lhr.life');
+    const activeApi = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://670586b9f53e6b.lhr.life');
     let backendSuccess = false;
     let deliveredKey = '';
     let newBal = profile.balance - price;
@@ -902,7 +892,7 @@ export default function App() {
   // ============================================================
   // ADMIN DASHBOARD HANDLERS (Sản phẩm, Người dùng, Đơn hàng)
   // ============================================================
-  const adminBaseUrl = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://180761536cc24a.lhr.life');
+  const adminBaseUrl = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://670586b9f53e6b.lhr.life');
   const getAdminHeaders = () => ({
     'Content-Type': 'application/json',
     'x-admin-key': adminKey || 'hai1110',
@@ -1288,12 +1278,9 @@ export default function App() {
           </p>
         </div>
 
-        <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 22, fontWeight: 500 }}>
-          {closeCountdown > 0 ? (
-            <>Tự động đóng Mini App sau <strong style={{ color: '#f87171', fontSize: 15, fontFamily: 'monospace' }}>{closeCountdown}s</strong>...</>
-          ) : (
-            <span style={{ color: '#fbbf24' }}>Đang thực hiện đóng Mini App...</span>
-          )}
+        <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 22, fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#38bdf8', display: 'inline-block' }} />
+          <span>Tự động kết nối lại ngay khi Bot được bật...</span>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', width: '100%', maxWidth: 280, gap: 10 }}>
