@@ -509,51 +509,7 @@
       "stockItems": [
         "W11PRO-YNMGQ-8RYV3-4PGQ3-C8XTP-7CF5M"
       ]
-    },
-    {
-      "id": "cmvzhvx1c0008dl5nztmmyqnt",
-      "name": "Spotify Premium 1 Năm",
-      "description": "Nghe nhạc lossless, tải offline, không quảng cáo",
-      "price": 180000,
-      "salePrice": 150000,
-      "imageUrl": "./icons/spotify.svg",
-      "category": {
-        "id": "cmvzhvx180000dl5n9t159vk0",
-        "name": "Tài khoản Premium",
-        "slug": "tai-khoan-premium",
-        "description": "Tài khoản giải trí chính chủ Netflix, Spotify, YouTube chất lượng cao, bảo hành trọn đời",
-        "imageUrl": "./icons/star.svg",
-        "isActive": true,
-        "sortOrder": 1,
-        "parentId": null,
-        "createdAt": "2026-11-02T16:50:21.308Z",
-        "updatedAt": "2026-11-04T19:41:50.567Z"
-      },
-      "stockCount": 0,
-      "stockItems": []
-    },
-    {
-      "id": "cmvzhvx1a0003dl5nj1lhf7cy",
-      "name": "Netflix Premium 4K UHD (1 Tháng)",
-      "description": "Xem 4K HDR, profile riêng biệt, bảo hành trọn thời gian",
-      "price": 65000,
-      "salePrice": 59000,
-      "imageUrl": "./icons/netflix.svg",
-      "category": {
-        "id": "cmvzhvx180000dl5n9t159vk0",
-        "name": "Tài khoản Premium",
-        "slug": "tai-khoan-premium",
-        "description": "Tài khoản giải trí chính chủ Netflix, Spotify, YouTube chất lượng cao, bảo hành trọn đời",
-        "imageUrl": "./icons/star.svg",
-        "isActive": true,
-        "sortOrder": 1,
-        "parentId": null,
-        "createdAt": "2026-11-02T16:50:21.308Z",
-        "updatedAt": "2026-11-04T19:41:50.567Z"
-      },
-      "stockCount": 0,
-      "stockItems": []
     }
   ],
-  "updatedAt": "2026-11-04T19:41:59.374Z"
+  "updatedAt": "2026-11-04T20:16:32.651Z"
 }
