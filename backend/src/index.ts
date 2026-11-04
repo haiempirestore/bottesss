@@ -59,27 +59,22 @@ const port = Number(process.env.PORT || 4000);
 const botToken = process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || '';
 const rawOrigin = process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
 const allowedOrigins = rawOrigin.split(',').map(s => s.trim());
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  crossOriginEmbedderPolicy: false,
+  crossOriginOpenerPolicy: false
+}));
 app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
-    if (
-      allowedOrigins.includes('*') ||
-      allowedOrigins.includes(origin) ||
-      origin.endsWith('.github.io') ||
-      origin.includes('localhost') ||
-      origin.includes('127.0.0.1')
-    ) {
-      return callback(null, true);
-    }
-    // Also allow tunnels like localtunnel, trycloudflare, ngrok
-    if (origin.includes('.trycloudflare.com') || origin.includes('.loca.lt') || origin.includes('.ngrok-free.app')) {
-      return callback(null, true);
-    }
-    return callback(null, true);
-  },
+  origin: true,
   credentials: true
 }));
+app.use((_req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-admin-key, bypass-tunnel-reminder');
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  next();
+});
 app.use(express.json({ limit: '1mb', verify: (req: any, _res, buf) => { req.rawBody = buf.toString('utf8'); } }));
 app.use(rateLimit({ windowMs: 60_000, limit: 120 }));
 app.get(['/health', '/api/health'], (_req, res) => {
@@ -1559,6 +1554,7 @@ async function generateVietQrBuffer(bank: string, accountNo: string, accountName
 let bot: Telegraf | undefined;
 if (botToken) {
   bot = new Telegraf(botToken);
+  isBotRunning = true;
   
   // Bắt lỗi toàn cục của Bot - Tránh mọi trường hợp lỗi làm sập tiến trình polling
   bot.catch((err: any, ctx: any) => {
@@ -1589,10 +1585,20 @@ if (botToken) {
   ]).then(() => console.log('✅ Đã cấu hình danh sách lệnh Bot (/start, /products, /nap...)'))
     .catch(err => console.error('Lỗi setMyCommands:', err));
 
+  function getLiveApiUrl(): string {
+    const s = loadStoreSettings();
+    return (s.apiPublicUrl || process.env.API_PUBLIC_URL || 'https://180761536cc24a.lhr.life').trim();
+  }
+
   // Bàn phím chính ghim ở chân khung chat (Reply Keyboard)
   function getMainMenuKeyboard() {
+    const s = loadStoreSettings();
+    const base = (s.webAppUrl || process.env.MINI_APP_URL || 'https://haiempirestore.github.io/bottesss/').trim();
+    const liveApi = getLiveApiUrl();
+    const sep = base.includes('?') ? '&' : '?';
+    const appUrl = `${base}${sep}api=${encodeURIComponent(liveApi)}`;
     return Markup.keyboard([
-      [Markup.button.webApp('🛍️ Shop Hai1110# Mini App', 'https://haiempirestore.github.io/bottesss/')],
+      [Markup.button.webApp('🛍️ Shop Hai1110# Mini App', appUrl)],
       ['🧮 Mua hàng', '🩵 Ví'],
       ['🤳 Hồ sơ', '📋 Lịch sử mua'],
       ['🎮 Trò Chơi', '⚠️ Hỗ trợ']
@@ -1601,7 +1607,9 @@ if (botToken) {
 
   // Tạo link Mini App đồng bộ thời gian thực thông tin số dư & đơn hàng từ bot tele
   async function getPersonalizedMiniAppUrl(telegramId: string | number) {
-    const base = (process.env.MINI_APP_URL || 'https://haiempirestore.github.io/bottesss/').trim();
+    const s = loadStoreSettings();
+    const base = (s.webAppUrl || process.env.MINI_APP_URL || 'https://haiempirestore.github.io/bottesss/').trim();
+    const liveApi = getLiveApiUrl();
     try {
       const user = await prisma.user.findUnique({
         where: { telegramId: String(telegramId) },
@@ -1614,29 +1622,34 @@ if (botToken) {
           }
         }
       });
-      if (!user) return base;
-      const totalSpent = user.orders.reduce((sum, o) => sum + Number(o.total), 0);
-      const ords = user.orders.map(o => ({
-        id: o.id,
-        code: o.code,
-        productName: o.items[0]?.product?.name || 'Sản phẩm',
-        total: o.total,
-        accountKey: o.items[0]?.delivered || '',
-        status: o.status,
-        date: o.createdAt
-      }));
       const params = new URLSearchParams();
-      params.set('uid', user.telegramId);
-      params.set('bal', String(user.balance));
-      params.set('spent', String(totalSpent));
-      if (user.firstName) params.set('name', user.firstName);
-      if (user.username) params.set('uname', user.username);
-      if (ords.length > 0) {
-        params.set('ords', Buffer.from(JSON.stringify(ords)).toString('base64url'));
+      params.set('api', liveApi);
+      params.set('_t', String(Date.now()));
+      if (user) {
+        const totalSpent = user.orders.reduce((sum, o) => sum + Number(o.total), 0);
+        const ords = user.orders.map(o => ({
+          id: o.id,
+          code: o.code,
+          productName: o.items[0]?.product?.name || 'Sản phẩm',
+          total: o.total,
+          accountKey: o.items[0]?.delivered || '',
+          status: o.status,
+          date: o.createdAt
+        }));
+        params.set('uid', user.telegramId);
+        params.set('bal', String(user.balance));
+        params.set('spent', String(totalSpent));
+        if (user.firstName) params.set('name', user.firstName);
+        if (user.username) params.set('uname', user.username);
+        if (ords.length > 0) {
+          params.set('ords', Buffer.from(JSON.stringify(ords)).toString('base64url'));
+        }
       }
-      return `${base}?${params.toString()}`;
+      const sep = base.includes('?') ? '&' : '?';
+      return `${base}${sep}${params.toString()}`;
     } catch {
-      return base;
+      const sep = base.includes('?') ? '&' : '?';
+      return `${base}${sep}api=${encodeURIComponent(liveApi)}&_t=${Date.now()}`;
     }
   }
 

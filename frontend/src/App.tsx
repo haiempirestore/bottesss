@@ -79,9 +79,35 @@ const isLocalhost = typeof window !== 'undefined' && (
 
 function getInitialApi(): string {
   if (typeof window === 'undefined') return '';
+  // 1. Ưu tiên kiểm tra query param ?api=... do chính Telegram Bot truyền
+  try {
+    const searchParams = new URLSearchParams(window.location.search);
+    const apiParam = searchParams.get('api');
+    if (apiParam) {
+      const decoded = decodeURIComponent(apiParam).trim();
+      if (decoded.startsWith('http://') || decoded.startsWith('https://')) return decoded;
+    }
+
+    // 2. Kiểm tra hash #api=...
+    const hash = window.location.hash.slice(1);
+    if (hash) {
+      const hashParams = new URLSearchParams(hash);
+      const hApi = hashParams.get('api');
+      if (hApi) {
+        const decoded = decodeURIComponent(hApi).trim();
+        if (decoded.startsWith('http://') || decoded.startsWith('https://')) return decoded;
+      }
+    }
+  } catch {}
+
+  // 3. Biến toàn cục từ config.js
   if (window.__API_URL__) return window.__API_URL__;
+
+  // 4. Localhost
   if (isLocalhost) return 'http://localhost:4000';
-  return 'https://ecfecaf60757b2.lhr.life';
+
+  // 5. Fallback URL
+  return 'https://180761536cc24a.lhr.life';
 }
 
 // Trích xuất dữ liệu người dùng thực tế từ Telegram WebApp SDK
@@ -225,7 +251,7 @@ export default function App() {
   // Trạng thái kết nối Bot Telegram (null = đang kiểm tra, true = online, false = bot tắt hoặc ngắt kết nối)
   const [botOnline, setBotOnline] = useState<boolean | null>(null);
   const [offlineReason, setOfflineReason] = useState<string>('');
-  const [closeCountdown, setCloseCountdown] = useState<number>(5);
+  const [closeCountdown, setCloseCountdown] = useState<number>(15);
 
   // User Profile thực tế từ Telegram WebApp
   const [profile, setProfile] = useState<any>(() => {
@@ -421,7 +447,7 @@ export default function App() {
     }));
 
     // 2. Đồng bộ thời gian thực từ Backend API (localhost hoặc tunnel nếu có)
-    const activeApi = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://ecfecaf60757b2.lhr.life');
+    const activeApi = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://180761536cc24a.lhr.life');
     if (effectiveTeleId) {
       fetch(`${activeApi}/api/user/sync?telegramId=${effectiveTeleId}`, {
         method: 'GET',
@@ -513,7 +539,7 @@ export default function App() {
 
   // Kiểm tra sức khỏe kết nối đến Bot Telegram
   const checkBotHealth = async (_isManualRetry = false): Promise<boolean> => {
-    const activeApi = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://ecfecaf60757b2.lhr.life');
+    const activeApi = apiUrl || getInitialApi();
     if (!activeApi) {
       setBotOnline(false);
       setOfflineReason('Chưa xác định được địa chỉ máy chủ Bot Telegram.');
@@ -521,43 +547,51 @@ export default function App() {
       return false;
     }
 
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
+    // Cho phép timeout 8 giây & thử 2 lần để tránh timeout do mạng 4G/tunnel
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-      const res = await fetch(`${activeApi}/health`, {
-        headers: { 'bypass-tunnel-reminder': 'true' },
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
+        const res = await fetch(`${activeApi}/health`, {
+          headers: { 'bypass-tunnel-reminder': 'true' },
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
 
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        if (data.maintenanceMode) {
+          setBotOnline(false);
+          setOfflineReason('Hệ thống đang tạm bảo trì theo cấu hình quản trị viên.');
+          setCloseCountdown(15);
+          return false;
+        }
+
+        if (data.botActive === false) {
+          setBotOnline(false);
+          setOfflineReason('Bot Telegram hiện chưa được kích hoạt hoặc đang khởi động lại.');
+          setCloseCountdown(15);
+          return false;
+        }
+
+        setBotOnline(true);
+        return true;
+      } catch (_err) {
+        if (attempt === 1) {
+          await new Promise((r) => setTimeout(r, 600));
+          continue;
+        }
       }
-
-      const data = await res.json();
-      if (data.maintenanceMode) {
-        setBotOnline(false);
-        setOfflineReason('Hệ thống đang tạm bảo trì theo cấu hình quản trị viên.');
-        setCloseCountdown(5);
-        return false;
-      }
-
-      if (data.botActive === false) {
-        setBotOnline(false);
-        setOfflineReason('Bot Telegram hiện chưa được kích hoạt hoặc đang khởi động lại.');
-        setCloseCountdown(5);
-        return false;
-      }
-
-      setBotOnline(true);
-      return true;
-    } catch (_err) {
-      setBotOnline(false);
-      setOfflineReason('Bot Telegram hiện đang tắt hoặc không thể kết nối. Mini App đã tạm thời đóng!');
-      setCloseCountdown(5);
-      return false;
     }
+
+    setBotOnline(false);
+    setOfflineReason('Bot Telegram hiện đang tắt hoặc không thể kết nối. Mini App đã tạm thời đóng!');
+    setCloseCountdown(15);
+    return false;
   };
 
   // Đếm ngược tự động đóng Mini App khi bot tắt
@@ -588,40 +622,35 @@ export default function App() {
 
   // Tải dữ liệu sản phẩm & danh mục từ Backend
   async function loadData() {
-    const activeApi = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://ecfecaf60757b2.lhr.life');
-    if (!activeApi) {
-      setBotOnline(false);
-      return;
-    }
+    const activeApi = apiUrl || getInitialApi();
+    if (!activeApi) return;
 
     try {
       const prodsRes = await fetch(`${activeApi}/api/products`, {
         headers: { 'bypass-tunnel-reminder': 'true' }
       });
-      if (!prodsRes.ok) throw new Error('Không thể tải sản phẩm');
-      const prods = await prodsRes.json();
-      if (Array.isArray(prods) && prods.length > 0) {
-        setProducts(filterUsedKeysFromProducts(prods));
+      if (prodsRes.ok) {
+        const prods = await prodsRes.json();
+        if (Array.isArray(prods) && prods.length > 0) {
+          setProducts(filterUsedKeysFromProducts(prods));
+        }
       }
 
       const catsRes = await fetch(`${activeApi}/api/categories`, {
         headers: { 'bypass-tunnel-reminder': 'true' }
       });
-      if (!catsRes.ok) throw new Error('Không thể tải danh mục');
-      const cats = await catsRes.json();
-      if (Array.isArray(cats) && cats.length > 0) {
-        setCategories(cats);
+      if (catsRes.ok) {
+        const cats = await catsRes.json();
+        if (Array.isArray(cats) && cats.length > 0) {
+          setCategories(cats);
+        }
       }
     } catch (_e) {
-      // Khi bot tắt hoặc lỗi kết nối, KHÔNG dùng fallback products.json
-      // mà đóng Mini App ngay để bảo vệ an toàn giao dịch
-      setBotOnline(false);
-      setOfflineReason('Không thể đồng bộ dữ liệu từ Bot Telegram.');
-      setCloseCountdown(5);
+      console.warn('Lỗi đồng bộ sản phẩm từ Bot:', _e);
     }
   }
 
-  // Khởi động kiểm tra sức khỏe bot và thiết lập Heartbeat 15 giây
+  // Khởi động kiểm tra sức khỏe bot và thiết lập Heartbeat định kỳ
   useEffect(() => {
     let isMounted = true;
 
@@ -634,13 +663,14 @@ export default function App() {
 
     initialCheck();
 
-    // Heartbeat: định kỳ mỗi 15 giây kiểm tra lại xem Bot có còn hoạt động không
+    // Heartbeat: định kỳ mỗi 20 giây kiểm tra lại xem Bot có còn hoạt động không
+    let consecutiveFails = 0;
     const heartbeat = setInterval(async () => {
-      const activeApi = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://ecfecaf60757b2.lhr.life');
+      const activeApi = apiUrl || getInitialApi();
       if (!activeApi) return;
       try {
         const controller = new AbortController();
-        const tid = setTimeout(() => controller.abort(), 3500);
+        const tid = setTimeout(() => controller.abort(), 8000);
         const res = await fetch(`${activeApi}/health`, {
           headers: { 'bypass-tunnel-reminder': 'true' },
           signal: controller.signal
@@ -652,17 +682,21 @@ export default function App() {
           if (isMounted) {
             setBotOnline(false);
             setOfflineReason(data.maintenanceMode ? 'Hệ thống đang bảo trì.' : 'Bot Telegram đã tạm ngưng hoạt động.');
-            setCloseCountdown(5);
+            setCloseCountdown(15);
           }
+          return;
         }
+        consecutiveFails = 0;
       } catch (_e) {
-        if (isMounted) {
+        consecutiveFails++;
+        // Cần thất bại 2 lần liên tiếp (ít nhất 40s mất kết nối) mới kết luận Bot tắt
+        if (consecutiveFails >= 2 && isMounted) {
           setBotOnline(false);
           setOfflineReason('Bot Telegram đã ngưng hoạt động. Mini App tự động đóng.');
-          setCloseCountdown(5);
+          setCloseCountdown(15);
         }
       }
-    }, 15000);
+    }, 20000);
 
     return () => {
       isMounted = false;
@@ -709,7 +743,7 @@ export default function App() {
       return;
     }
 
-    const activeApi = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://ecfecaf60757b2.lhr.life');
+    const activeApi = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://180761536cc24a.lhr.life');
     let backendSuccess = false;
     let deliveredKey = '';
     let newBal = profile.balance - price;
@@ -868,7 +902,7 @@ export default function App() {
   // ============================================================
   // ADMIN DASHBOARD HANDLERS (Sản phẩm, Người dùng, Đơn hàng)
   // ============================================================
-  const adminBaseUrl = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://ecfecaf60757b2.lhr.life');
+  const adminBaseUrl = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://180761536cc24a.lhr.life');
   const getAdminHeaders = () => ({
     'Content-Type': 'application/json',
     'x-admin-key': adminKey || 'hai1110',
