@@ -10,145 +10,145 @@
       "id": "cmvzhvx180000dl5n9t159vk0",
       "name": "Tài khoản Premium",
       "slug": "tai-khoan-premium",
-      "description": "Tài khoản giải trí chính chủ chất lượng cao",
-      "imageUrl": null,
+      "description": "Tài khoản giải trí chính chủ Netflix, Spotify, YouTube chất lượng cao, bảo hành trọn đời",
+      "imageUrl": "./icons/star.svg",
       "isActive": true,
       "sortOrder": 1,
       "parentId": null,
       "createdAt": "2026-11-02T16:50:21.308Z",
-      "updatedAt": "2026-11-02T16:50:21.308Z"
+      "updatedAt": "2026-11-04T19:41:50.567Z"
     },
     {
       "id": "cmvzli7uw0000dlsby1mkol35",
       "name": "🟩 Microsoft",
       "slug": "microsoft",
-      "description": null,
-      "imageUrl": null,
+      "description": "Hệ sinh thái Microsoft bản quyền chính hãng (Windows 11, Office 365)",
+      "imageUrl": "./icons/windows.svg",
       "isActive": true,
       "sortOrder": 1,
       "parentId": null,
       "createdAt": "2026-11-02T18:31:40.616Z",
-      "updatedAt": "2026-11-02T18:31:40.616Z"
+      "updatedAt": "2026-11-04T19:41:50.574Z"
     },
     {
       "id": "cmvzhvx1a0001dl5nxa8qrvd1",
       "name": "Phần mềm & Bản quyền",
       "slug": "phan-mem-ban-quyen",
-      "description": "Key bản quyền Windows, Office, VPN",
-      "imageUrl": null,
+      "description": "Key bản quyền Windows, Office, VPN chính hãng kích hoạt online 1 lần dùng vĩnh viễn",
+      "imageUrl": "./icons/key.svg",
       "isActive": true,
       "sortOrder": 2,
       "parentId": null,
       "createdAt": "2026-11-02T16:50:21.310Z",
-      "updatedAt": "2026-11-02T16:50:21.310Z"
+      "updatedAt": "2026-11-04T19:41:50.573Z"
     },
     {
       "id": "cmvzli7uy0001dlsb8fvbxpat",
       "name": "✨ Google",
       "slug": "google",
-      "description": null,
-      "imageUrl": null,
+      "description": "Dịch vụ nâng cấp Google One, Google Drive dung lượng cao chính chủ",
+      "imageUrl": "./icons/google.svg",
       "isActive": true,
       "sortOrder": 2,
       "parentId": null,
       "createdAt": "2026-11-02T18:31:40.619Z",
-      "updatedAt": "2026-11-02T18:31:40.619Z"
+      "updatedAt": "2026-11-04T19:41:50.574Z"
     },
     {
       "id": "cmvzli7uz0002dlsbriaxopj7",
       "name": "📦 Source",
       "slug": "source-code",
-      "description": null,
-      "imageUrl": null,
+      "description": "Mã nguồn bot Telegram, source code MMO độc quyền tối ưu",
+      "imageUrl": "./icons/code.svg",
       "isActive": true,
       "sortOrder": 3,
       "parentId": null,
       "createdAt": "2026-11-02T18:31:40.619Z",
-      "updatedAt": "2026-11-02T18:31:40.619Z"
+      "updatedAt": "2026-11-04T19:41:50.575Z"
     },
     {
       "id": "cmvzli7v00003dlsb1l5e8s0x",
       "name": "🎨 Canva",
       "slug": "canva",
-      "description": null,
-      "imageUrl": null,
+      "description": "Tài khoản thiết kế đồ hoạ Canva Pro không giới hạn tính năng VIP",
+      "imageUrl": "./icons/canva.svg",
       "isActive": true,
       "sortOrder": 4,
       "parentId": null,
       "createdAt": "2026-11-02T18:31:40.620Z",
-      "updatedAt": "2026-11-02T18:31:40.620Z"
+      "updatedAt": "2026-11-04T19:41:50.575Z"
     },
     {
       "id": "cmvzli7v00004dlsbgkno8zbv",
       "name": "🤖 ChatGPT",
       "slug": "chatgpt",
-      "description": null,
-      "imageUrl": null,
+      "description": "Tài khoản trí tuệ nhân tạo ChatGPT Plus, OpenAI GPT-4o cao cấp",
+      "imageUrl": "./icons/chatgpt.svg",
       "isActive": true,
       "sortOrder": 5,
       "parentId": null,
       "createdAt": "2026-11-02T18:31:40.621Z",
-      "updatedAt": "2026-11-02T18:31:40.621Z"
+      "updatedAt": "2026-11-04T19:41:50.575Z"
     },
     {
       "id": "cmvzli7v10005dlsbpa9e9eg2",
       "name": "✂️ Capcut",
       "slug": "capcut",
-      "description": null,
-      "imageUrl": null,
+      "description": "Tài khoản CapCut Pro chính chủ mở khoá hiệu ứng và xuất video 4K 60fps",
+      "imageUrl": "./icons/capcut.svg",
       "isActive": true,
       "sortOrder": 6,
       "parentId": null,
       "createdAt": "2026-11-02T18:31:40.622Z",
-      "updatedAt": "2026-11-02T18:31:40.622Z"
+      "updatedAt": "2026-11-04T19:41:50.576Z"
     },
     {
       "id": "cmvzli7v20006dlsbouhedpcd",
       "name": "⚙️ Tools",
       "slug": "tools",
-      "description": null,
-      "imageUrl": null,
+      "description": "Công cụ MMO, tool tự động hoá nuôi nick và download video đa nền tảng",
+      "imageUrl": "./icons/tool.svg",
       "isActive": true,
       "sortOrder": 7,
       "parentId": null,
       "createdAt": "2026-11-02T18:31:40.623Z",
-      "updatedAt": "2026-11-02T18:31:40.623Z"
+      "updatedAt": "2026-11-04T19:41:50.576Z"
     },
     {
       "id": "cmvzli7v30007dlsbc577lmvn",
       "name": "🦉 Duolingo",
       "slug": "duolingo",
-      "description": null,
-      "imageUrl": null,
+      "description": "Gói học ngoại ngữ Duolingo Super không quảng cáo, học không giới hạn",
+      "imageUrl": "./icons/duolingo.svg",
       "isActive": true,
       "sortOrder": 8,
       "parentId": null,
       "createdAt": "2026-11-02T18:31:40.624Z",
-      "updatedAt": "2026-11-02T18:31:40.624Z"
+      "updatedAt": "2026-11-04T19:41:50.577Z"
     },
     {
       "id": "cmvzli7v40008dlsbo581ln4y",
       "name": "🛡️ ExpressVPN",
       "slug": "expressvpn",
-      "description": null,
-      "imageUrl": null,
+      "description": "Mạng riêng ảo tốc độ cao, bảo mật IP vượt mọi tường lửa",
+      "imageUrl": "./icons/vpn.svg",
       "isActive": true,
       "sortOrder": 9,
       "parentId": null,
       "createdAt": "2026-11-02T18:31:40.625Z",
-      "updatedAt": "2026-11-02T18:31:40.625Z"
+      "updatedAt": "2026-11-04T19:41:50.577Z"
     },
     {
       "id": "cmvzli7v50009dlsb887xlyw3",
       "name": "⭐ Dịch vụ khác",
       "slug": "dich-vu-khac",
-      "description": null,
-      "imageUrl": null,
+      "description": "Các gói dịch vụ số và tài khoản bản quyền độc quyền khác",
+      "imageUrl": "./icons/star.svg",
       "isActive": true,
       "sortOrder": 10,
       "parentId": null,
       "createdAt": "2026-11-02T18:31:40.625Z",
-      "updatedAt": "2026-11-02T18:31:40.625Z"
+      "updatedAt": "2026-11-04T19:41:50.577Z"
     }
   ],
   "products": [
@@ -158,18 +158,18 @@
       "description": "Không biết gì",
       "price": 50000,
       "salePrice": 30000,
-      "imageUrl": "https://cellphones.com.vn/sforum/duolingo-meme",
+      "imageUrl": "./icons/duolingo.svg",
       "category": {
         "id": "cmvzli7v30007dlsbc577lmvn",
         "name": "🦉 Duolingo",
         "slug": "duolingo",
-        "description": null,
-        "imageUrl": null,
+        "description": "Gói học ngoại ngữ Duolingo Super không quảng cáo, học không giới hạn",
+        "imageUrl": "./icons/duolingo.svg",
         "isActive": true,
         "sortOrder": 8,
         "parentId": null,
         "createdAt": "2026-11-02T18:31:40.624Z",
-        "updatedAt": "2026-11-02T18:31:40.624Z"
+        "updatedAt": "2026-11-04T19:41:50.577Z"
       },
       "stockCount": 0,
       "stockItems": []
@@ -180,18 +180,18 @@
       "description": "Tải không watermark full HD chất lượng cao",
       "price": 80000,
       "salePrice": 60000,
-      "imageUrl": null,
+      "imageUrl": "./icons/tool.svg",
       "category": {
         "id": "cmvzli7v20006dlsbouhedpcd",
         "name": "⚙️ Tools",
         "slug": "tools",
-        "description": null,
-        "imageUrl": null,
+        "description": "Công cụ MMO, tool tự động hoá nuôi nick và download video đa nền tảng",
+        "imageUrl": "./icons/tool.svg",
         "isActive": true,
         "sortOrder": 7,
         "parentId": null,
         "createdAt": "2026-11-02T18:31:40.623Z",
-        "updatedAt": "2026-11-02T18:31:40.623Z"
+        "updatedAt": "2026-11-04T19:41:50.576Z"
       },
       "stockCount": 0,
       "stockItems": []
@@ -202,18 +202,18 @@
       "description": "Auto tương tác, nuôi nick sạch, bypass checkpoint",
       "price": 150000,
       "salePrice": 120000,
-      "imageUrl": null,
+      "imageUrl": "./icons/tool.svg",
       "category": {
         "id": "cmvzli7v20006dlsbouhedpcd",
         "name": "⚙️ Tools",
         "slug": "tools",
-        "description": null,
-        "imageUrl": null,
+        "description": "Công cụ MMO, tool tự động hoá nuôi nick và download video đa nền tảng",
+        "imageUrl": "./icons/tool.svg",
         "isActive": true,
         "sortOrder": 7,
         "parentId": null,
         "createdAt": "2026-11-02T18:31:40.623Z",
-        "updatedAt": "2026-11-02T18:31:40.623Z"
+        "updatedAt": "2026-11-04T19:41:50.576Z"
       },
       "stockCount": 1,
       "stockItems": [
@@ -226,18 +226,18 @@
       "description": "Sản phẩm bàn giao tự động tức thì 24/7",
       "price": 180000,
       "salePrice": 150000,
-      "imageUrl": null,
+      "imageUrl": "./icons/spotify.svg",
       "category": {
         "id": "cmvzli7v50009dlsb887xlyw3",
         "name": "⭐ Dịch vụ khác",
         "slug": "dich-vu-khac",
-        "description": null,
-        "imageUrl": null,
+        "description": "Các gói dịch vụ số và tài khoản bản quyền độc quyền khác",
+        "imageUrl": "./icons/star.svg",
         "isActive": true,
         "sortOrder": 10,
         "parentId": null,
         "createdAt": "2026-11-02T18:31:40.625Z",
-        "updatedAt": "2026-11-02T18:31:40.625Z"
+        "updatedAt": "2026-11-04T19:41:50.577Z"
       },
       "stockCount": 1,
       "stockItems": [
@@ -250,18 +250,18 @@
       "description": "Sản phẩm bàn giao tự động tức thì 24/7",
       "price": 65000,
       "salePrice": 59000,
-      "imageUrl": null,
+      "imageUrl": "./icons/netflix.svg",
       "category": {
         "id": "cmvzli7v50009dlsb887xlyw3",
         "name": "⭐ Dịch vụ khác",
         "slug": "dich-vu-khac",
-        "description": null,
-        "imageUrl": null,
+        "description": "Các gói dịch vụ số và tài khoản bản quyền độc quyền khác",
+        "imageUrl": "./icons/star.svg",
         "isActive": true,
         "sortOrder": 10,
         "parentId": null,
         "createdAt": "2026-11-02T18:31:40.625Z",
-        "updatedAt": "2026-11-02T18:31:40.625Z"
+        "updatedAt": "2026-11-04T19:41:50.577Z"
       },
       "stockCount": 2,
       "stockItems": [
@@ -275,18 +275,18 @@
       "description": "Sản phẩm bàn giao tự động tức thì 24/7",
       "price": 650000,
       "salePrice": 490000,
-      "imageUrl": null,
+      "imageUrl": "./icons/code.svg",
       "category": {
         "id": "cmvzli7uz0002dlsbriaxopj7",
         "name": "📦 Source",
         "slug": "source-code",
-        "description": null,
-        "imageUrl": null,
+        "description": "Mã nguồn bot Telegram, source code MMO độc quyền tối ưu",
+        "imageUrl": "./icons/code.svg",
         "isActive": true,
         "sortOrder": 3,
         "parentId": null,
         "createdAt": "2026-11-02T18:31:40.619Z",
-        "updatedAt": "2026-11-02T18:31:40.619Z"
+        "updatedAt": "2026-11-04T19:41:50.575Z"
       },
       "stockCount": 2,
       "stockItems": [
@@ -300,18 +300,18 @@
       "description": "Sản phẩm bàn giao tự động tức thì 24/7",
       "price": 350000,
       "salePrice": 299000,
-      "imageUrl": null,
+      "imageUrl": "./icons/vpn.svg",
       "category": {
         "id": "cmvzli7v40008dlsbo581ln4y",
         "name": "🛡️ ExpressVPN",
         "slug": "expressvpn",
-        "description": null,
-        "imageUrl": null,
+        "description": "Mạng riêng ảo tốc độ cao, bảo mật IP vượt mọi tường lửa",
+        "imageUrl": "./icons/vpn.svg",
         "isActive": true,
         "sortOrder": 9,
         "parentId": null,
         "createdAt": "2026-11-02T18:31:40.625Z",
-        "updatedAt": "2026-11-02T18:31:40.625Z"
+        "updatedAt": "2026-11-04T19:41:50.577Z"
       },
       "stockCount": 2,
       "stockItems": [
@@ -325,18 +325,18 @@
       "description": "Sản phẩm bàn giao tự động tức thì 24/7",
       "price": 150000,
       "salePrice": 110000,
-      "imageUrl": null,
+      "imageUrl": "./icons/duolingo.svg",
       "category": {
         "id": "cmvzli7v30007dlsbc577lmvn",
         "name": "🦉 Duolingo",
         "slug": "duolingo",
-        "description": null,
-        "imageUrl": null,
+        "description": "Gói học ngoại ngữ Duolingo Super không quảng cáo, học không giới hạn",
+        "imageUrl": "./icons/duolingo.svg",
         "isActive": true,
         "sortOrder": 8,
         "parentId": null,
         "createdAt": "2026-11-02T18:31:40.624Z",
-        "updatedAt": "2026-11-02T18:31:40.624Z"
+        "updatedAt": "2026-11-04T19:41:50.577Z"
       },
       "stockCount": 1,
       "stockItems": [
@@ -349,18 +349,18 @@
       "description": "Sản phẩm bàn giao tự động tức thì 24/7",
       "price": 220000,
       "salePrice": 180000,
-      "imageUrl": null,
+      "imageUrl": "./icons/capcut.svg",
       "category": {
         "id": "cmvzli7v10005dlsbpa9e9eg2",
         "name": "✂️ Capcut",
         "slug": "capcut",
-        "description": null,
-        "imageUrl": null,
+        "description": "Tài khoản CapCut Pro chính chủ mở khoá hiệu ứng và xuất video 4K 60fps",
+        "imageUrl": "./icons/capcut.svg",
         "isActive": true,
         "sortOrder": 6,
         "parentId": null,
         "createdAt": "2026-11-02T18:31:40.622Z",
-        "updatedAt": "2026-11-02T18:31:40.622Z"
+        "updatedAt": "2026-11-04T19:41:50.576Z"
       },
       "stockCount": 1,
       "stockItems": [
@@ -373,18 +373,18 @@
       "description": "Sản phẩm bàn giao tự động tức thì 24/7",
       "price": 290000,
       "salePrice": 240000,
-      "imageUrl": null,
+      "imageUrl": "./icons/chatgpt.svg",
       "category": {
         "id": "cmvzli7v00004dlsbgkno8zbv",
         "name": "🤖 ChatGPT",
         "slug": "chatgpt",
-        "description": null,
-        "imageUrl": null,
+        "description": "Tài khoản trí tuệ nhân tạo ChatGPT Plus, OpenAI GPT-4o cao cấp",
+        "imageUrl": "./icons/chatgpt.svg",
         "isActive": true,
         "sortOrder": 5,
         "parentId": null,
         "createdAt": "2026-11-02T18:31:40.621Z",
-        "updatedAt": "2026-11-02T18:31:40.621Z"
+        "updatedAt": "2026-11-04T19:41:50.575Z"
       },
       "stockCount": 2,
       "stockItems": [
@@ -398,18 +398,18 @@
       "description": "Sản phẩm bàn giao tự động tức thì 24/7",
       "price": 120000,
       "salePrice": 89000,
-      "imageUrl": null,
+      "imageUrl": "./icons/canva.svg",
       "category": {
         "id": "cmvzli7v00003dlsb1l5e8s0x",
         "name": "🎨 Canva",
         "slug": "canva",
-        "description": null,
-        "imageUrl": null,
+        "description": "Tài khoản thiết kế đồ hoạ Canva Pro không giới hạn tính năng VIP",
+        "imageUrl": "./icons/canva.svg",
         "isActive": true,
         "sortOrder": 4,
         "parentId": null,
         "createdAt": "2026-11-02T18:31:40.620Z",
-        "updatedAt": "2026-11-02T18:31:40.620Z"
+        "updatedAt": "2026-11-04T19:41:50.575Z"
       },
       "stockCount": 2,
       "stockItems": [
@@ -423,18 +423,18 @@
       "description": "Sản phẩm bàn giao tự động tức thì 24/7",
       "price": 350000,
       "salePrice": 299000,
-      "imageUrl": null,
+      "imageUrl": "./icons/google.svg",
       "category": {
         "id": "cmvzli7uy0001dlsb8fvbxpat",
         "name": "✨ Google",
         "slug": "google",
-        "description": null,
-        "imageUrl": null,
+        "description": "Dịch vụ nâng cấp Google One, Google Drive dung lượng cao chính chủ",
+        "imageUrl": "./icons/google.svg",
         "isActive": true,
         "sortOrder": 2,
         "parentId": null,
         "createdAt": "2026-11-02T18:31:40.619Z",
-        "updatedAt": "2026-11-02T18:31:40.619Z"
+        "updatedAt": "2026-11-04T19:41:50.574Z"
       },
       "stockCount": 2,
       "stockItems": [
@@ -448,18 +448,18 @@
       "description": "Sản phẩm bàn giao tự động tức thì 24/7",
       "price": 190000,
       "salePrice": 150000,
-      "imageUrl": null,
+      "imageUrl": "./icons/office.svg",
       "category": {
         "id": "cmvzli7uw0000dlsby1mkol35",
         "name": "🟩 Microsoft",
         "slug": "microsoft",
-        "description": null,
-        "imageUrl": null,
+        "description": "Hệ sinh thái Microsoft bản quyền chính hãng (Windows 11, Office 365)",
+        "imageUrl": "./icons/windows.svg",
         "isActive": true,
         "sortOrder": 1,
         "parentId": null,
         "createdAt": "2026-11-02T18:31:40.616Z",
-        "updatedAt": "2026-11-02T18:31:40.616Z"
+        "updatedAt": "2026-11-04T19:41:50.574Z"
       },
       "stockCount": 0,
       "stockItems": []
@@ -470,18 +470,18 @@
       "description": "Sản phẩm bàn giao tự động tức thì 24/7",
       "price": 120000,
       "salePrice": 99000,
-      "imageUrl": null,
+      "imageUrl": "./icons/windows.svg",
       "category": {
         "id": "cmvzli7uw0000dlsby1mkol35",
         "name": "🟩 Microsoft",
         "slug": "microsoft",
-        "description": null,
-        "imageUrl": null,
+        "description": "Hệ sinh thái Microsoft bản quyền chính hãng (Windows 11, Office 365)",
+        "imageUrl": "./icons/windows.svg",
         "isActive": true,
         "sortOrder": 1,
         "parentId": null,
         "createdAt": "2026-11-02T18:31:40.616Z",
-        "updatedAt": "2026-11-02T18:31:40.616Z"
+        "updatedAt": "2026-11-04T19:41:50.574Z"
       },
       "stockCount": 0,
       "stockItems": []
@@ -492,18 +492,18 @@
       "description": "Kích hoạt vĩnh viễn theo mainboard, update thoải mái",
       "price": 120000,
       "salePrice": 99000,
-      "imageUrl": null,
+      "imageUrl": "./icons/windows.svg",
       "category": {
         "id": "cmvzhvx1a0001dl5nxa8qrvd1",
         "name": "Phần mềm & Bản quyền",
         "slug": "phan-mem-ban-quyen",
-        "description": "Key bản quyền Windows, Office, VPN",
-        "imageUrl": null,
+        "description": "Key bản quyền Windows, Office, VPN chính hãng kích hoạt online 1 lần dùng vĩnh viễn",
+        "imageUrl": "./icons/key.svg",
         "isActive": true,
         "sortOrder": 2,
         "parentId": null,
         "createdAt": "2026-11-02T16:50:21.310Z",
-        "updatedAt": "2026-11-02T16:50:21.310Z"
+        "updatedAt": "2026-11-04T19:41:50.573Z"
       },
       "stockCount": 1,
       "stockItems": [
@@ -516,18 +516,18 @@
       "description": "Nghe nhạc lossless, tải offline, không quảng cáo",
       "price": 180000,
       "salePrice": 150000,
-      "imageUrl": null,
+      "imageUrl": "./icons/spotify.svg",
       "category": {
         "id": "cmvzhvx180000dl5n9t159vk0",
         "name": "Tài khoản Premium",
         "slug": "tai-khoan-premium",
-        "description": "Tài khoản giải trí chính chủ chất lượng cao",
-        "imageUrl": null,
+        "description": "Tài khoản giải trí chính chủ Netflix, Spotify, YouTube chất lượng cao, bảo hành trọn đời",
+        "imageUrl": "./icons/star.svg",
         "isActive": true,
         "sortOrder": 1,
         "parentId": null,
         "createdAt": "2026-11-02T16:50:21.308Z",
-        "updatedAt": "2026-11-02T16:50:21.308Z"
+        "updatedAt": "2026-11-04T19:41:50.567Z"
       },
       "stockCount": 0,
       "stockItems": []
@@ -538,22 +538,22 @@
       "description": "Xem 4K HDR, profile riêng biệt, bảo hành trọn thời gian",
       "price": 65000,
       "salePrice": 59000,
-      "imageUrl": null,
+      "imageUrl": "./icons/netflix.svg",
       "category": {
         "id": "cmvzhvx180000dl5n9t159vk0",
         "name": "Tài khoản Premium",
         "slug": "tai-khoan-premium",
-        "description": "Tài khoản giải trí chính chủ chất lượng cao",
-        "imageUrl": null,
+        "description": "Tài khoản giải trí chính chủ Netflix, Spotify, YouTube chất lượng cao, bảo hành trọn đời",
+        "imageUrl": "./icons/star.svg",
         "isActive": true,
         "sortOrder": 1,
         "parentId": null,
         "createdAt": "2026-11-02T16:50:21.308Z",
-        "updatedAt": "2026-11-02T16:50:21.308Z"
+        "updatedAt": "2026-11-04T19:41:50.567Z"
       },
       "stockCount": 0,
       "stockItems": []
     }
   ],
-  "updatedAt": "2026-11-03T01:15:49.339Z"
+  "updatedAt": "2026-11-04T19:41:59.374Z"
 }
