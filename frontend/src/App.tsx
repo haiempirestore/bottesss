@@ -233,6 +233,9 @@ type Category = {
   id: string;
   name: string;
   slug: string;
+  description?: string;
+  imageUrl?: string;
+  sortOrder?: number;
 };
 
 export default function App() {
@@ -1649,18 +1652,71 @@ export default function App() {
                 className={`chip-btn ${selectedCategory === 'all' ? 'active' : ''}`}
                 onClick={() => setSelectedCategory('all')}
               >
-                Tất cả
+                🔥 Tất cả
               </button>
               {categories.map((c) => (
                 <button
                   key={c.id || c.slug}
                   className={`chip-btn ${selectedCategory === c.slug ? 'active' : ''}`}
                   onClick={() => setSelectedCategory(c.slug)}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                 >
-                  {c.name}
+                  {c.imageUrl && (
+                    <img
+                      src={c.imageUrl}
+                      alt=""
+                      onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                      style={{ width: '16px', height: '16px', objectFit: 'contain' }}
+                    />
+                  )}
+                  <span>{c.name}</span>
                 </button>
               ))}
             </div>
+
+            {/* Chi tiết mô tả danh mục đang chọn (nếu có) */}
+            {selectedCategory !== 'all' && (() => {
+              const currentCat = categories.find(c => c.slug === selectedCategory || c.name === selectedCategory);
+              if (!currentCat) return null;
+              return (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '12px 14px',
+                  borderRadius: '14px',
+                  background: 'rgba(255, 36, 83, 0.08)',
+                  border: '1px solid rgba(255, 36, 83, 0.25)',
+                  marginBottom: '12px'
+                }}>
+                  <div style={{
+                    width: '38px',
+                    height: '38px',
+                    borderRadius: '10px',
+                    background: '#150710',
+                    border: '1px solid rgba(255, 36, 83, 0.3)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    overflow: 'hidden'
+                  }}>
+                    <img
+                      src={currentCat.imageUrl || './icons/star.svg'}
+                      alt={currentCat.name}
+                      onError={e => { (e.currentTarget as HTMLImageElement).src = './icons/star.svg'; }}
+                      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                    />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#fff' }}>{currentCat.name}</div>
+                    <div style={{ fontSize: '11.5px', color: '#94a3b8', lineHeight: 1.4 }}>
+                      {currentCat.description || 'Chính hãng, bảo hành 1 đổi 1 suốt thời gian sử dụng'}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Tiêu đề & Nút sắp xếp */}
             <div className="sub-title-row" style={{ marginBottom: 0 }}>
@@ -1691,19 +1747,17 @@ export default function App() {
                     onClick={() => setProductModal(p)}
                   >
                     {/* Thumbnail */}
-                    <div className="product-thumb-wrap">
-                      {p.imageUrl ? (
-                        <img src={p.imageUrl} alt={p.name} />
-                      ) : (
-                        <span className="product-fallback-icon">
-                          {p.name.includes('ChatGPT') ? '🤖' :
-                           p.name.includes('Canva') ? '🎨' :
-                           p.name.includes('Microsoft') ? '🟩' :
-                           p.name.includes('Capcut') ? '✂️' :
-                           p.name.includes('Duolingo') ? '🦉' :
-                           p.name.includes('VPN') ? '🛡️' : '📦'}
-                        </span>
-                      )}
+                    <div className="product-thumb-wrap" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle, #240b17 0%, #0c0409 100%)' }}>
+                      <img
+                        src={p.imageUrl || './icons/star.svg'}
+                        alt={p.name}
+                        onError={(e) => {
+                          const target = e.currentTarget as HTMLImageElement;
+                          target.onerror = null;
+                          target.src = './icons/star.svg';
+                        }}
+                        style={{ width: '60px', height: '60px', objectFit: 'contain' }}
+                      />
 
                       {isOutOfStock && (
                         <div className="outofstock-badge">
@@ -2459,19 +2513,17 @@ export default function App() {
               </button>
             </div>
 
-            <div className="product-thumb-wrap" style={{ aspectRatio: '16/9' }}>
-              {productModal.imageUrl ? (
-                <img src={productModal.imageUrl} alt={productModal.name} />
-              ) : (
-                <span style={{ fontSize: 48 }}>
-                  {productModal.name.includes('ChatGPT') ? '🤖' :
-                   productModal.name.includes('Canva') ? '🎨' :
-                   productModal.name.includes('Microsoft') ? '🟩' :
-                   productModal.name.includes('Capcut') ? '✂️' :
-                   productModal.name.includes('Duolingo') ? '🦉' :
-                   productModal.name.includes('VPN') ? '🛡️' : '📦'}
-                </span>
-              )}
+            <div className="product-thumb-wrap" style={{ aspectRatio: '16/9', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle, #240b17 0%, #0c0409 100%)', borderRadius: 16, overflow: 'hidden' }}>
+              <img
+                src={productModal.imageUrl || './icons/star.svg'}
+                alt={productModal.name}
+                onError={(e) => {
+                  const target = e.currentTarget as HTMLImageElement;
+                  target.onerror = null;
+                  target.src = './icons/star.svg';
+                }}
+                style={{ maxHeight: '75%', maxWidth: '75%', objectFit: 'contain' }}
+              />
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -2488,7 +2540,7 @@ export default function App() {
               <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
                 MÔ TẢ CHI TIẾT
               </span>
-              <p style={{ fontSize: 13, color: 'var(--text-sub)', marginTop: 6, lineHeight: 1.5 }}>
+              <p style={{ fontSize: 13, color: 'var(--text-sub)', marginTop: 6, lineHeight: 1.5, whiteSpace: 'pre-line' }}>
                 {productModal.description ||
                   'Tài khoản chính hãng, bảo hành trọn thời gian sử dụng. Giao key / tài khoản tức thì sau khi thanh toán qua Telegram Bot.'}
               </p>

@@ -1273,10 +1273,100 @@ app.patch('/api/admin/orders/:id/status', adminAuth, async (req, res) => {
 });
 
 app.post('/api/admin/categories', adminAuth, async (req, res) => {
-  const data = z.object({ name: z.string().min(1), slug: z.string().min(1).regex(/^[a-z0-9-]+$/), description: z.string().optional() }).parse(req.body);
-  const cat = await prisma.category.create({ data });
-  await exportGithubProducts();
-  res.json(cat);
+  try {
+    const data = z.object({
+      name: z.string().min(1),
+      slug: z.string().min(1).regex(/^[a-z0-9-]+$/),
+      description: z.string().optional(),
+      imageUrl: z.string().optional(),
+      sortOrder: z.number().optional()
+    }).parse(req.body);
+    const cat = await prisma.category.create({ data });
+    await exportGithubProducts();
+    res.json(cat);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Lỗi tạo danh mục' });
+  }
+});
+
+app.put('/api/admin/categories/:id', adminAuth, async (req, res) => {
+  try {
+    const id = String(req.params.id);
+    const data = req.body;
+    const updated = await prisma.category.update({
+      where: { id },
+      data: {
+        name: data.name !== undefined ? String(data.name).trim() : undefined,
+        slug: data.slug !== undefined ? String(data.slug).trim() : undefined,
+        description: data.description !== undefined ? (data.description ? String(data.description).trim() : null) : undefined,
+        imageUrl: data.imageUrl !== undefined ? (data.imageUrl ? String(data.imageUrl).trim() : null) : undefined,
+        sortOrder: data.sortOrder !== undefined ? Number(data.sortOrder) : undefined,
+        isActive: data.isActive !== undefined ? Boolean(data.isActive) : undefined
+      }
+    });
+    await exportGithubProducts();
+    res.json(updated);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Lỗi cập nhật danh mục' });
+  }
+});
+
+app.delete('/api/admin/categories/:id', adminAuth, async (req, res) => {
+  try {
+    const id = String(req.params.id);
+    const count = await prisma.product.count({ where: { categoryId: id } });
+    if (count > 0) {
+      return res.status(400).json({ error: `Không thể xoá vì danh mục này đang chứa ${count} sản phẩm. Hãy chuyển danh mục hoặc xoá sản phẩm trước!` });
+    }
+    await prisma.category.delete({ where: { id } });
+    await exportGithubProducts();
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Lỗi xoá danh mục' });
+  }
+});
+
+app.delete('/api/admin/keys/:id', adminAuth, async (req, res) => {
+  try {
+    const id = String(req.params.id);
+    await prisma.stockItem.delete({ where: { id } });
+    await exportGithubProducts();
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Lỗi xoá key kho' });
+  }
+});
+
+app.post('/api/admin/upload-image', adminAuth, async (req, res) => {
+  try {
+    const { imageBase64 } = req.body;
+    if (!imageBase64 || typeof imageBase64 !== 'string') {
+      return res.status(400).json({ error: 'Dữ liệu ảnh không hợp lệ' });
+    }
+    const matches = imageBase64.match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
+    if (!matches) {
+      return res.json({ ok: true, url: imageBase64 });
+    }
+    const ext = matches[1].replace('jpeg', 'jpg');
+    const buffer = Buffer.from(matches[2], 'base64');
+    const safeName = `img_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.${ext}`;
+
+    const uploadsDir = path.resolve(__dirname, '../../frontend/public/uploads');
+    const distUploadsDir = path.resolve(__dirname, '../../frontend/dist/uploads');
+    const ghUploadsDir = path.resolve(__dirname, '../../githubpage/uploads');
+
+    await fs.promises.mkdir(uploadsDir, { recursive: true }).catch(() => {});
+    await fs.promises.mkdir(distUploadsDir, { recursive: true }).catch(() => {});
+    await fs.promises.mkdir(ghUploadsDir, { recursive: true }).catch(() => {});
+
+    await fs.promises.writeFile(path.join(uploadsDir, safeName), buffer);
+    await fs.promises.writeFile(path.join(distUploadsDir, safeName), buffer).catch(() => {});
+    await fs.promises.writeFile(path.join(ghUploadsDir, safeName), buffer).catch(() => {});
+
+    res.json({ ok: true, url: `./uploads/${safeName}` });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Lỗi lưu ảnh' });
+  }
 });
 
 // Xuất danh mục & sản phẩm ra file products.json cho GitHub Pages chạy không cần tunnel/VPS

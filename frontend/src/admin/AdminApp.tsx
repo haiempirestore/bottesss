@@ -31,8 +31,39 @@ import {
   Megaphone,
   CreditCard,
   Menu,
-  X
+  X,
+  Layers,
+  UploadCloud,
+  Image as ImageIcon,
+  Sparkles,
+  Filter
 } from 'lucide-react';
+
+export const MAGNIFIC_ICONS = [
+  { name: 'ChatGPT', icon: './icons/chatgpt.svg', category: 'AI' },
+  { name: 'Gemini', icon: './icons/gemini.svg', category: 'AI' },
+  { name: 'Midjourney', icon: './icons/midjourney.svg', category: 'AI' },
+  { name: 'Netflix', icon: './icons/netflix.svg', category: 'Giải trí' },
+  { name: 'Spotify', icon: './icons/spotify.svg', category: 'Âm nhạc' },
+  { name: 'YouTube', icon: './icons/youtube.svg', category: 'Giải trí' },
+  { name: 'Apple Music', icon: './icons/apple.svg', category: 'Âm nhạc' },
+  { name: 'Windows 11', icon: './icons/windows.svg', category: 'Hệ điều hành' },
+  { name: 'Office 365', icon: './icons/office.svg', category: 'Văn phòng' },
+  { name: 'Google One', icon: './icons/google.svg', category: 'Lưu trữ' },
+  { name: 'Canva Pro', icon: './icons/canva.svg', category: 'Thiết kế' },
+  { name: 'CapCut Pro', icon: './icons/capcut.svg', category: 'Video' },
+  { name: 'Adobe', icon: './icons/adobe.svg', category: 'Đồ hoạ' },
+  { name: 'Duolingo', icon: './icons/duolingo.svg', category: 'Học tập' },
+  { name: 'VPN Security', icon: './icons/vpn.svg', category: 'Bảo mật' },
+  { name: 'Telegram', icon: './icons/telegram.svg', category: 'Chat' },
+  { name: 'Discord', icon: './icons/discord.svg', category: 'Cộng đồng' },
+  { name: 'Steam', icon: './icons/steam.svg', category: 'Game' },
+  { name: 'GitHub', icon: './icons/github.svg', category: 'Code' },
+  { name: 'Source Code', icon: './icons/code.svg', category: 'Source' },
+  { name: 'Tools MMO', icon: './icons/tool.svg', category: 'Tool' },
+  { name: 'Key Bản Quyền', icon: './icons/key.svg', category: 'Key' },
+  { name: 'Dịch Vụ VIP', icon: './icons/star.svg', category: 'VIP' }
+];
 
 declare global {
   interface Window {
@@ -68,7 +99,7 @@ export default function AdminApp() {
   const [tempApiUrl, setTempApiUrl] = useState(apiUrl);
 
   // Navigation
-  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'bot' | 'users' | 'orders' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'categories' | 'products' | 'bot' | 'users' | 'orders' | 'settings'>('overview');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   // Data states
@@ -84,9 +115,22 @@ export default function AdminApp() {
 
   // Search & Filter
   const [searchProduct, setSearchProduct] = useState('');
+  const [searchCategory, setSearchCategory] = useState('');
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('ALL');
   const [searchUser, setSearchUser] = useState('');
   const [searchOrder, setSearchOrder] = useState('');
   const [orderStatusFilter, setOrderStatusFilter] = useState('ALL');
+
+  // Category Modal
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<any>(null);
+  const [categoryForm, setCategoryForm] = useState({
+    name: '',
+    slug: '',
+    description: '',
+    imageUrl: './icons/star.svg',
+    sortOrder: 1
+  });
 
   // Modals
   const [showProductModal, setShowProductModal] = useState(false);
@@ -333,6 +377,124 @@ export default function AdminApp() {
     }
   };
 
+  const handleDeleteKey = async (keyId: string) => {
+    if (!confirm('Bạn có chắc muốn xoá key này khỏi kho?')) return;
+    try {
+      const res = await fetch(`${apiUrl}/api/admin/keys/${keyId}`, {
+        method: 'DELETE',
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        setViewKeysModal(prev => ({
+          ...prev,
+          keys: prev.keys.filter(k => k.id !== keyId)
+        }));
+        fetchData();
+        alert('✅ Đã xoá key khỏi kho thành công!');
+      } else {
+        alert('Lỗi khi xoá key');
+      }
+    } catch {
+      alert('Lỗi kết nối xoá key');
+    }
+  };
+
+  // Category Actions
+  const handleSaveCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!categoryForm.name.trim()) return;
+    const slug = categoryForm.slug.trim() || categoryForm.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    try {
+      if (editingCategory) {
+        await fetch(`${apiUrl}/api/admin/categories/${editingCategory.id}`, {
+          method: 'PUT',
+          headers: getHeaders(),
+          body: JSON.stringify({
+            name: categoryForm.name.trim(),
+            slug,
+            description: categoryForm.description.trim(),
+            imageUrl: categoryForm.imageUrl.trim() || undefined,
+            sortOrder: Number(categoryForm.sortOrder) || 1
+          })
+        });
+      } else {
+        await fetch(`${apiUrl}/api/admin/categories`, {
+          method: 'POST',
+          headers: getHeaders(),
+          body: JSON.stringify({
+            name: categoryForm.name.trim(),
+            slug,
+            description: categoryForm.description.trim(),
+            imageUrl: categoryForm.imageUrl.trim() || undefined,
+            sortOrder: Number(categoryForm.sortOrder) || 1
+          })
+        });
+      }
+      setShowCategoryModal(false);
+      setEditingCategory(null);
+      fetchData();
+      alert(`✅ Đã ${editingCategory ? 'cập nhật' : 'thêm'} danh mục thành công!`);
+    } catch (e: any) {
+      alert('Lỗi lưu danh mục: ' + (e.message || 'Thất bại'));
+    }
+  };
+
+  const handleDeleteCategory = async (cat: any) => {
+    if (!confirm(`Bạn có chắc muốn xoá danh mục "${cat.name}"?`)) return;
+    try {
+      const res = await fetch(`${apiUrl}/api/admin/categories/${cat.id}`, {
+        method: 'DELETE',
+        headers: getHeaders()
+      });
+      const data = await res.json();
+      if (res.ok) {
+        fetchData();
+        alert('✅ Đã xoá danh mục thành công!');
+      } else {
+        alert('❌ ' + (data.error || 'Lỗi xoá danh mục'));
+      }
+    } catch {
+      alert('Lỗi kết nối khi xoá danh mục');
+    }
+  };
+
+  // Image Upload Handler
+  const handleUploadImageFile = async (file: File, target: 'product' | 'category') => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64 = reader.result as string;
+      try {
+        const res = await fetch(`${apiUrl}/api/admin/upload-image`, {
+          method: 'POST',
+          headers: getHeaders(),
+          body: JSON.stringify({ imageBase64: base64 })
+        });
+        const data = await res.json();
+        if (data.ok && data.url) {
+          if (target === 'product') {
+            setProductForm(prev => ({ ...prev, imageUrl: data.url }));
+          } else {
+            setCategoryForm(prev => ({ ...prev, imageUrl: data.url }));
+          }
+        } else {
+          if (target === 'product') {
+            setProductForm(prev => ({ ...prev, imageUrl: base64 }));
+          } else {
+            setCategoryForm(prev => ({ ...prev, imageUrl: base64 }));
+          }
+        }
+      } catch {
+        if (target === 'product') {
+          setProductForm(prev => ({ ...prev, imageUrl: base64 }));
+        } else {
+          setCategoryForm(prev => ({ ...prev, imageUrl: base64 }));
+        }
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   // User Actions
   const handleAdjustBalance = async () => {
     if (!balanceModal.user || balanceModal.amount <= 0) return;
@@ -519,11 +681,27 @@ export default function AdminApp() {
 
   // Filtered lists
   const filteredProducts = useMemo(() => {
-    return products.filter(p =>
-      p.name.toLowerCase().includes(searchProduct.toLowerCase()) ||
-      (p.category?.name && p.category.name.toLowerCase().includes(searchProduct.toLowerCase()))
+    return products.filter(p => {
+      const matchSearch =
+        p.name.toLowerCase().includes(searchProduct.toLowerCase()) ||
+        (p.category?.name && p.category.name.toLowerCase().includes(searchProduct.toLowerCase())) ||
+        (p.description && p.description.toLowerCase().includes(searchProduct.toLowerCase()));
+      const matchCat =
+        selectedCategoryFilter === 'ALL' ||
+        p.categoryId === selectedCategoryFilter ||
+        p.category?.id === selectedCategoryFilter ||
+        p.category?.slug === selectedCategoryFilter;
+      return matchSearch && matchCat;
+    });
+  }, [products, searchProduct, selectedCategoryFilter]);
+
+  const filteredCategories = useMemo(() => {
+    return categories.filter(c =>
+      c.name.toLowerCase().includes(searchCategory.toLowerCase()) ||
+      (c.description && c.description.toLowerCase().includes(searchCategory.toLowerCase())) ||
+      (c.slug && c.slug.toLowerCase().includes(searchCategory.toLowerCase()))
     );
-  }, [products, searchProduct]);
+  }, [categories, searchCategory]);
 
   const filteredUsers = useMemo(() => {
     return users.filter(u =>
@@ -681,6 +859,15 @@ export default function AdminApp() {
 
           <div className="admin-nav-category">Quản Lý Mini App</div>
           <button
+            className={`admin-nav-item ${activeTab === 'categories' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('categories'); setMobileSidebarOpen(false); }}
+          >
+            <Layers size={18} />
+            <span>Danh Mục Sản Phẩm</span>
+            <span className="admin-nav-badge">{categories.length}</span>
+          </button>
+
+          <button
             className={`admin-nav-item ${activeTab === 'products' ? 'active' : ''}`}
             onClick={() => { setActiveTab('products'); setMobileSidebarOpen(false); }}
           >
@@ -760,6 +947,7 @@ export default function AdminApp() {
             </button>
             <div className="admin-page-title">
               {activeTab === 'overview' && '📊 Báo Cáo & Thống Kê Tổng Quan'}
+              {activeTab === 'categories' && '📁 Quản Lý Danh Mục: Tên, Mô Tả & Icon Đại Diện'}
               {activeTab === 'products' && '🛍️ Quản Lý Mini App: Sản Phẩm & Kho Key'}
               {activeTab === 'bot' && '🤖 Quản Lý Telegram Bot & Bắn Thông Báo'}
               {activeTab === 'users' && '👥 Quản Lý Người Dùng & Biến Động Số Dư'}
@@ -937,8 +1125,8 @@ export default function AdminApp() {
             </div>
           )}
 
-          {/* TAB 2: PRODUCTS & STOCK */}
-          {activeTab === 'products' && (
+          {/* TAB: CATEGORIES */}
+          {activeTab === 'categories' && (
             <div>
               <div className="admin-section-header">
                 <div className="admin-actions-bar">
@@ -946,10 +1134,159 @@ export default function AdminApp() {
                     <Search size={16} color="#94a3b8" />
                     <input
                       type="text"
-                      placeholder="Tìm kiếm sản phẩm theo tên..."
+                      placeholder="Tìm kiếm danh mục theo tên hoặc mô tả..."
+                      value={searchCategory}
+                      onChange={e => setSearchCategory(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="admin-actions-bar">
+                  <button onClick={handleSyncGithub} className="btn-admin btn-admin-success btn-admin-sm">
+                    <Download size={14} /> Xuất GitHub Pages
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditingCategory(null);
+                      setCategoryForm({
+                        name: '',
+                        slug: '',
+                        description: '',
+                        imageUrl: './icons/star.svg',
+                        sortOrder: categories.length + 1
+                      });
+                      setShowCategoryModal(true);
+                    }}
+                    className="btn-admin btn-admin-primary"
+                  >
+                    <Plus size={16} /> + Thêm Danh Mục Mới
+                  </button>
+                </div>
+              </div>
+
+              {/* Category Cards Grid */}
+              <div className="category-card-grid">
+                {filteredCategories.map(cat => {
+                  const prodCount = products.filter(p => p.categoryId === cat.id || p.category?.id === cat.id).length;
+                  return (
+                    <div key={cat.id} className="category-card">
+                      <div>
+                        <div className="category-card-top">
+                          <div className="category-card-icon">
+                            <img
+                              src={cat.imageUrl || './icons/star.svg'}
+                              alt={cat.name}
+                              onError={e => { (e.currentTarget as HTMLImageElement).src = './icons/star.svg'; }}
+                            />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div className="category-card-title">{cat.name}</div>
+                            <div className="category-card-slug">slug: {cat.slug}</div>
+                          </div>
+                        </div>
+
+                        <div className="category-card-desc" title={cat.description || 'Chưa có mô tả'}>
+                          {cat.description || <span style={{ color: '#64748b', fontStyle: 'italic' }}>Chưa có mô tả danh mục (Bấm sửa để thêm)</span>}
+                        </div>
+                      </div>
+
+                      <div className="category-card-footer">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '3px 8px',
+                            borderRadius: '6px',
+                            fontSize: '11.5px',
+                            fontWeight: 700,
+                            background: 'rgba(255, 36, 83, 0.12)',
+                            color: '#ff4772'
+                          }}>
+                            <ShoppingBag size={12} /> {prodCount} SP
+                          </span>
+                          <span style={{ fontSize: '11px', color: '#64748b' }}>
+                            Thứ tự: #{cat.sortOrder ?? 1}
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button
+                            onClick={() => {
+                              setSelectedCategoryFilter(cat.id);
+                              setActiveTab('products');
+                            }}
+                            className="btn-admin btn-admin-secondary btn-admin-sm"
+                            title="Lọc xem sản phẩm danh mục này"
+                          >
+                            <Eye size={13} /> Xem SP
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingCategory(cat);
+                              setCategoryForm({
+                                name: cat.name,
+                                slug: cat.slug || '',
+                                description: cat.description || '',
+                                imageUrl: cat.imageUrl || './icons/star.svg',
+                                sortOrder: cat.sortOrder || 1
+                              });
+                              setShowCategoryModal(true);
+                            }}
+                            className="btn-admin btn-admin-secondary btn-admin-sm"
+                            title="Sửa danh mục & mô tả"
+                          >
+                            <Edit3 size={13} /> Sửa
+                          </button>
+                          <button
+                            onClick={() => handleDeleteCategory(cat)}
+                            className="btn-admin btn-admin-danger btn-admin-sm"
+                            title="Xoá danh mục"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: PRODUCTS & STOCK */}
+          {activeTab === 'products' && (
+            <div>
+              <div className="admin-section-header">
+                <div className="admin-actions-bar" style={{ flexWrap: 'wrap' }}>
+                  <div className="admin-input-search">
+                    <Search size={16} color="#94a3b8" />
+                    <input
+                      type="text"
+                      placeholder="Tìm kiếm sản phẩm theo tên, mô tả..."
                       value={searchProduct}
                       onChange={e => setSearchProduct(e.target.value)}
                     />
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Filter size={15} color="#94a3b8" />
+                    <select
+                      className="admin-form-control"
+                      style={{ padding: '8px 12px', fontSize: '13px', width: 'auto', background: '#180713', color: '#fff' }}
+                      value={selectedCategoryFilter}
+                      onChange={e => setSelectedCategoryFilter(e.target.value)}
+                    >
+                      <option value="ALL">📁 Tất cả danh mục ({products.length})</option>
+                      {categories.map(c => {
+                        const count = products.filter(p => p.categoryId === c.id || p.category?.id === c.id).length;
+                        return (
+                          <option key={c.id} value={c.id}>
+                            {c.name} ({count})
+                          </option>
+                        );
+                      })}
+                    </select>
                   </div>
                 </div>
 
@@ -966,7 +1303,7 @@ export default function AdminApp() {
                         price: 50000,
                         salePrice: 0,
                         description: '',
-                        imageUrl: '',
+                        imageUrl: './icons/star.svg',
                         initialKeys: ''
                       });
                       setShowProductModal(true);
@@ -1000,9 +1337,10 @@ export default function AdminApp() {
                             <td>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                 <img
-                                  src={p.imageUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=100&q=80'}
+                                  src={p.imageUrl || './icons/star.svg'}
                                   alt=""
-                                  style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover', border: '1px solid rgba(255, 36, 83, 0.2)' }}
+                                  onError={e => { (e.currentTarget as HTMLImageElement).src = './icons/star.svg'; }}
+                                  style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'contain', background: '#180713', padding: '3px', border: '1px solid rgba(255, 36, 83, 0.2)' }}
                                 />
                                 <div>
                                   <div style={{ fontWeight: 700, color: '#fff' }}>{p.name}</div>
@@ -1641,16 +1979,188 @@ export default function AdminApp() {
         </div>
       </main>
 
+      {/* MODAL: THÊM / SỬA DANH MỤC */}
+      {showCategoryModal && (
+        <div className="admin-modal-overlay">
+          <div className="admin-modal-card" style={{ maxWidth: '620px' }}>
+            <div className="admin-modal-header">
+              <h3>{editingCategory ? '✏️ Chỉnh Sửa Danh Mục Sản Phẩm' : '➕ Thêm Danh Mục Mới'}</h3>
+              <button onClick={() => setShowCategoryModal(false)} className="admin-modal-close"><X size={18} /></button>
+            </div>
+            <form onSubmit={handleSaveCategory}>
+              <div className="admin-modal-body" style={{ maxHeight: '72vh', overflowY: 'auto' }}>
+                {/* Live Preview Box */}
+                <div className="image-preview-container">
+                  <div className="image-preview-thumb">
+                    {categoryForm.imageUrl ? (
+                      <img
+                        src={categoryForm.imageUrl}
+                        alt="Preview"
+                        onError={e => { (e.currentTarget as HTMLImageElement).src = './icons/star.svg'; }}
+                      />
+                    ) : (
+                      <Layers size={30} color="#ff2453" />
+                    )}
+                  </div>
+                  <div className="image-preview-meta" style={{ flex: 1 }}>
+                    <h4>{categoryForm.name || 'Tên danh mục xem trước'}</h4>
+                    <p>
+                      slug: <code style={{ color: '#38bdf8' }}>{categoryForm.slug || 'slug-danh-muc'}</code> • Thứ tự: #{categoryForm.sortOrder}
+                    </p>
+                    <div style={{ fontSize: '11px', color: '#64748b', marginTop: '3px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '380px' }}>
+                      {categoryForm.description || 'Chưa nhập mô tả danh mục'}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '14px' }}>
+                  <div className="admin-form-group">
+                    <label className="admin-form-label">Tên danh mục *</label>
+                    <input
+                      type="text"
+                      className="admin-form-control"
+                      placeholder="VD: 🎬 Tài Khoản Phim & Giải Trí"
+                      value={categoryForm.name}
+                      onChange={e => setCategoryForm({ ...categoryForm, name: e.target.value })}
+                      required
+                    />
+                  </div>
+
+                  <div className="admin-form-group">
+                    <label className="admin-form-label">Thứ tự hiển thị</label>
+                    <input
+                      type="number"
+                      className="admin-form-control"
+                      value={categoryForm.sortOrder}
+                      onChange={e => setCategoryForm({ ...categoryForm, sortOrder: Number(e.target.value) })}
+                    />
+                  </div>
+                </div>
+
+                <div className="admin-form-group">
+                  <label className="admin-form-label">Đường dẫn rút gọn (Slug)</label>
+                  <input
+                    type="text"
+                    className="admin-form-control"
+                    placeholder="vd: tai-khoan-phim (để trống sẽ tự động tạo)"
+                    value={categoryForm.slug}
+                    onChange={e => setCategoryForm({ ...categoryForm, slug: e.target.value })}
+                  />
+                </div>
+
+                {/* Mô tả danh mục */}
+                <div className="admin-form-group">
+                  <label className="admin-form-label">Mô tả danh mục (Hiển thị cho khách hàng trên Mini App)</label>
+                  <textarea
+                    className="admin-form-control"
+                    rows={3}
+                    placeholder="VD: Tổng hợp các gói tài khoản xem phim bản quyền 4K chất lượng cao, bảo hành 1 đổi 1 suốt thời gian dùng..."
+                    value={categoryForm.description}
+                    onChange={e => setCategoryForm({ ...categoryForm, description: e.target.value })}
+                  />
+                </div>
+
+                {/* Image & Icon Chooser */}
+                <div className="admin-form-group">
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <label className="admin-form-label" style={{ marginBottom: 0 }}>Icon / Ảnh đại diện danh mục</label>
+                    <label className="file-upload-dropzone">
+                      <UploadCloud size={14} /> Tải ảnh lên
+                      <input
+                        type="file"
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        onChange={e => {
+                          const f = e.target.files?.[0];
+                          if (f) handleUploadImageFile(f, 'category');
+                        }}
+                      />
+                    </label>
+                  </div>
+
+                  <input
+                    type="text"
+                    className="admin-form-control"
+                    placeholder="Nhập URL ảnh hoặc bấm chọn nhanh icon bên dưới..."
+                    value={categoryForm.imageUrl}
+                    onChange={e => setCategoryForm({ ...categoryForm, imageUrl: e.target.value })}
+                  />
+
+                  {/* Magnific Icons Picker */}
+                  <div style={{ marginTop: '8px' }}>
+                    <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Sparkles size={13} color="#ff2453" /> Thư viện Icon Website Bản Quyền (Magnific Icons):
+                    </div>
+                    <div className="icon-picker-grid">
+                      {MAGNIFIC_ICONS.map(item => {
+                        const isSelected = categoryForm.imageUrl === item.icon;
+                        return (
+                          <button
+                            key={item.name}
+                            type="button"
+                            className={`icon-picker-btn ${isSelected ? 'active' : ''}`}
+                            onClick={() => setCategoryForm({ ...categoryForm, imageUrl: item.icon })}
+                            title={item.name}
+                          >
+                            <img src={item.icon} alt={item.name} />
+                            <span>{item.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="admin-modal-footer">
+                <button type="button" onClick={() => setShowCategoryModal(false)} className="btn-admin btn-admin-secondary">
+                  Huỷ bỏ
+                </button>
+                <button type="submit" className="btn-admin btn-admin-primary">
+                  {editingCategory ? 'Lưu Thay Đổi' : 'Thêm Danh Mục'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* MODAL: THÊM / SỬA SẢN PHẨM */}
       {showProductModal && (
         <div className="admin-modal-overlay">
-          <div className="admin-modal-card">
+          <div className="admin-modal-card" style={{ maxWidth: '640px' }}>
             <div className="admin-modal-header">
-              <h3>{editingProduct ? '✏️ Chỉnh Sửa Sản Phẩm' : '➕ Thêm Sản Phẩm Mới'}</h3>
+              <h3>{editingProduct ? '✏️ Chỉnh Sửa Sản Phẩm & Mô Tả' : '➕ Thêm Sản Phẩm Mới'}</h3>
               <button onClick={() => setShowProductModal(false)} className="admin-modal-close"><X size={18} /></button>
             </div>
             <form onSubmit={handleSaveProduct}>
-              <div className="admin-modal-body">
+              <div className="admin-modal-body" style={{ maxHeight: '72vh', overflowY: 'auto' }}>
+                {/* Live Preview Box */}
+                <div className="image-preview-container">
+                  <div className="image-preview-thumb">
+                    {productForm.imageUrl ? (
+                      <img
+                        src={productForm.imageUrl}
+                        alt="Preview"
+                        onError={e => { (e.currentTarget as HTMLImageElement).src = './icons/star.svg'; }}
+                      />
+                    ) : (
+                      <ImageIcon size={30} color="#ff2453" />
+                    )}
+                  </div>
+                  <div className="image-preview-meta" style={{ flex: 1 }}>
+                    <h4>{productForm.name || 'Tên sản phẩm xem trước'}</h4>
+                    <p>
+                      {categories.find(c => c.id === productForm.categoryId)?.name || 'Chung'} •{' '}
+                      <strong style={{ color: '#ff2453' }}>{Number(productForm.price || 0).toLocaleString('vi-VN')}đ</strong>
+                      {productForm.salePrice ? ` (Sale: ${Number(productForm.salePrice).toLocaleString('vi-VN')}đ)` : ''}
+                    </p>
+                    <div style={{ fontSize: '11px', color: '#64748b', marginTop: '3px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '380px' }}>
+                      {productForm.description || 'Chưa nhập mô tả sản phẩm'}
+                    </div>
+                  </div>
+                </div>
+
                 <div className="admin-form-group">
                   <label className="admin-form-label">Tên sản phẩm *</label>
                   <input
@@ -1676,22 +2186,24 @@ export default function AdminApp() {
                   </div>
 
                   <div className="admin-form-group">
-                    <label className="admin-form-label">Giá khuyến mãi (Để trống nếu không có)</label>
+                    <label className="admin-form-label">Giá khuyến mãi (VNĐ)</label>
                     <input
                       type="number"
                       className="admin-form-control"
-                      value={productForm.salePrice}
+                      placeholder="Để trống nếu không giảm giá"
+                      value={productForm.salePrice || ''}
                       onChange={e => setProductForm({ ...productForm, salePrice: Number(e.target.value) })}
                     />
                   </div>
                 </div>
 
                 <div className="admin-form-group">
-                  <label className="admin-form-label">Danh mục</label>
+                  <label className="admin-form-label">Danh mục sản phẩm *</label>
                   <select
                     className="admin-form-control"
                     value={productForm.categoryId}
                     onChange={e => setProductForm({ ...productForm, categoryId: e.target.value })}
+                    required
                   >
                     {categories.map(c => (
                       <option key={c.id} value={c.id}>{c.name}</option>
@@ -1699,23 +2211,90 @@ export default function AdminApp() {
                   </select>
                 </div>
 
+                {/* Image Chooser: Upload, Magnific website icons, URL */}
                 <div className="admin-form-group">
-                  <label className="admin-form-label">Link ảnh sản phẩm (URL)</label>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <label className="admin-form-label" style={{ marginBottom: 0 }}>
+                      Hình Ảnh & Icon Đại Diện ("nhận ảnh")
+                    </label>
+                    <label className="file-upload-dropzone">
+                      <UploadCloud size={14} /> Tải ảnh từ máy tính / điện thoại
+                      <input
+                        type="file"
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        onChange={e => {
+                          const f = e.target.files?.[0];
+                          if (f) handleUploadImageFile(f, 'product');
+                        }}
+                      />
+                    </label>
+                  </div>
+
                   <input
                     type="text"
                     className="admin-form-control"
-                    placeholder="https://images.unsplash.com/..."
+                    placeholder="Nhập URL ảnh hoặc bấm chọn nhanh icon bên dưới..."
                     value={productForm.imageUrl}
                     onChange={e => setProductForm({ ...productForm, imageUrl: e.target.value })}
                   />
+
+                  {/* Magnific Website Icons library */}
+                  <div style={{ marginTop: '8px' }}>
+                    <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Sparkles size={13} color="#ff2453" /> Thư viện Icon Website Bản Quyền (Magnific Icons - Bấm để chọn):
+                    </div>
+                    <div className="icon-picker-grid">
+                      {MAGNIFIC_ICONS.map(item => {
+                        const isSelected = productForm.imageUrl === item.icon;
+                        return (
+                          <button
+                            key={item.name}
+                            type="button"
+                            className={`icon-picker-btn ${isSelected ? 'active' : ''}`}
+                            onClick={() => setProductForm({ ...productForm, imageUrl: item.icon })}
+                            title={item.name}
+                          >
+                            <img src={item.icon} alt={item.name} />
+                            <span>{item.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
 
+                {/* Mô tả chi tiết sản phẩm */}
                 <div className="admin-form-group">
-                  <label className="admin-form-label">Mô tả chi tiết</label>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <label className="admin-form-label" style={{ marginBottom: 0 }}>Mô tả sản phẩm</label>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        type="button"
+                        style={{ fontSize: '11px', background: 'rgba(255, 36, 83, 0.1)', border: 'none', color: '#ff4772', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer' }}
+                        onClick={() => setProductForm(prev => ({
+                          ...prev,
+                          description: (prev.description ? prev.description + '\n' : '') + '🛡️ Bảo hành 1 đổi 1 trong suốt thời gian sử dụng.\n⚡ Giao tài khoản tự động ngay sau khi thanh toán.'
+                        }))}
+                      >
+                        + Mẫu bảo hành
+                      </button>
+                      <button
+                        type="button"
+                        style={{ fontSize: '11px', background: 'rgba(56, 189, 248, 0.1)', border: 'none', color: '#38bdf8', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer' }}
+                        onClick={() => setProductForm(prev => ({
+                          ...prev,
+                          description: (prev.description ? prev.description + '\n' : '') + '💎 Tài khoản chính chủ kích hoạt trên email riêng của bạn.'
+                        }))}
+                      >
+                        + Mẫu chính chủ
+                      </button>
+                    </div>
+                  </div>
                   <textarea
                     className="admin-form-control"
-                    rows={2}
-                    placeholder="Bảo hành 1 đổi 1 trong suốt thời gian sử dụng..."
+                    rows={3}
+                    placeholder="Nhập mô tả sản phẩm: tính năng nổi bật, thời hạn sử dụng, chính sách bảo hành..."
                     value={productForm.description}
                     onChange={e => setProductForm({ ...productForm, description: e.target.value })}
                   />
@@ -1824,8 +2403,16 @@ export default function AdminApp() {
                         <button
                           onClick={() => copyToClipboard(k.payload, k.id)}
                           className="btn-admin btn-admin-secondary btn-admin-sm"
+                          title="Sao chép key"
                         >
                           {copiedKey === k.id ? <Check size={12} color="#10b981" /> : <Copy size={12} />}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteKey(k.id)}
+                          className="btn-admin btn-admin-danger btn-admin-sm"
+                          title="Xoá key này khỏi kho"
+                        >
+                          <Trash2 size={12} />
                         </button>
                       </div>
                     </div>
