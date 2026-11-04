@@ -60,6 +60,7 @@ declare global {
         };
         ready(): void;
         expand(): void;
+        close(): void;
         openTelegramLink(url: string): void;
         sendData(data: string): void;
         HapticFeedback?: {
@@ -80,7 +81,7 @@ function getInitialApi(): string {
   if (typeof window === 'undefined') return '';
   if (window.__API_URL__) return window.__API_URL__;
   if (isLocalhost) return 'http://localhost:4000';
-  return 'https://4236d49d22d882.lhr.life';
+  return 'https://ecfecaf60757b2.lhr.life';
 }
 
 // Trích xuất dữ liệu người dùng thực tế từ Telegram WebApp SDK
@@ -220,6 +221,11 @@ export default function App() {
     accountNo: 'HAI100TR',
     accountName: 'NGUYEN HOANG HAI'
   });
+
+  // Trạng thái kết nối Bot Telegram (null = đang kiểm tra, true = online, false = bot tắt hoặc ngắt kết nối)
+  const [botOnline, setBotOnline] = useState<boolean | null>(null);
+  const [offlineReason, setOfflineReason] = useState<string>('');
+  const [closeCountdown, setCloseCountdown] = useState<number>(5);
 
   // User Profile thực tế từ Telegram WebApp
   const [profile, setProfile] = useState<any>(() => {
@@ -415,7 +421,7 @@ export default function App() {
     }));
 
     // 2. Đồng bộ thời gian thực từ Backend API (localhost hoặc tunnel nếu có)
-    const activeApi = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://4236d49d22d882.lhr.life');
+    const activeApi = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://ecfecaf60757b2.lhr.life');
     if (effectiveTeleId) {
       fetch(`${activeApi}/api/user/sync?telegramId=${effectiveTeleId}`, {
         method: 'GET',
@@ -505,42 +511,163 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
-  // Tải dữ liệu sản phẩm & danh mục
-  async function loadData() {
-    const activeApi = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://4236d49d22d882.lhr.life');
-    if (activeApi) {
-      try {
-        const prods = await fetch(`${activeApi}/api/products`, {
-          headers: { 'bypass-tunnel-reminder': 'true' }
-        }).then((r) => r.json());
-        if (Array.isArray(prods) && prods.length > 0) {
-          setProducts(filterUsedKeysFromProducts(prods));
-        }
-        const cats = await fetch(`${activeApi}/api/categories`, {
-          headers: { 'bypass-tunnel-reminder': 'true' }
-        }).then((r) => r.json());
-        if (Array.isArray(cats) && cats.length > 0) {
-          setCategories(cats);
-        }
-        return;
-      } catch (_e) {}
+  // Kiểm tra sức khỏe kết nối đến Bot Telegram
+  const checkBotHealth = async (_isManualRetry = false): Promise<boolean> => {
+    const activeApi = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://ecfecaf60757b2.lhr.life');
+    if (!activeApi) {
+      setBotOnline(false);
+      setOfflineReason('Chưa xác định được địa chỉ máy chủ Bot Telegram.');
+      setCloseCountdown(5);
+      return false;
     }
 
-    // Chế độ GitHub Pages Serverless: Đọc từ products.json
     try {
-      const res = await fetch('./products.json');
-      if (res.ok) {
-        const json = await res.json();
-        if (json.products) setProducts(filterUsedKeysFromProducts(json.products));
-        if (json.categories) setCategories(json.categories);
-        if (json.botUsername) setBotUsername(json.botUsername);
-        if (json.bankConfig) setBankConfig(json.bankConfig);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+      const res = await fetch(`${activeApi}/health`, {
+        headers: { 'bypass-tunnel-reminder': 'true' },
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
       }
-    } catch (_e) {}
+
+      const data = await res.json();
+      if (data.maintenanceMode) {
+        setBotOnline(false);
+        setOfflineReason('Hệ thống đang tạm bảo trì theo cấu hình quản trị viên.');
+        setCloseCountdown(5);
+        return false;
+      }
+
+      if (data.botActive === false) {
+        setBotOnline(false);
+        setOfflineReason('Bot Telegram hiện chưa được kích hoạt hoặc đang khởi động lại.');
+        setCloseCountdown(5);
+        return false;
+      }
+
+      setBotOnline(true);
+      return true;
+    } catch (_err) {
+      setBotOnline(false);
+      setOfflineReason('Bot Telegram hiện đang tắt hoặc không thể kết nối. Mini App đã tạm thời đóng!');
+      setCloseCountdown(5);
+      return false;
+    }
+  };
+
+  // Đếm ngược tự động đóng Mini App khi bot tắt
+  useEffect(() => {
+    if (botOnline !== false) return;
+
+    window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('error');
+
+    const timer = setInterval(() => {
+      setCloseCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          try {
+            if (window.Telegram?.WebApp?.close) {
+              window.Telegram.WebApp.close();
+            } else if (typeof window !== 'undefined' && window.close) {
+              window.close();
+            }
+          } catch {}
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [botOnline]);
+
+  // Tải dữ liệu sản phẩm & danh mục từ Backend
+  async function loadData() {
+    const activeApi = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://ecfecaf60757b2.lhr.life');
+    if (!activeApi) {
+      setBotOnline(false);
+      return;
+    }
+
+    try {
+      const prodsRes = await fetch(`${activeApi}/api/products`, {
+        headers: { 'bypass-tunnel-reminder': 'true' }
+      });
+      if (!prodsRes.ok) throw new Error('Không thể tải sản phẩm');
+      const prods = await prodsRes.json();
+      if (Array.isArray(prods) && prods.length > 0) {
+        setProducts(filterUsedKeysFromProducts(prods));
+      }
+
+      const catsRes = await fetch(`${activeApi}/api/categories`, {
+        headers: { 'bypass-tunnel-reminder': 'true' }
+      });
+      if (!catsRes.ok) throw new Error('Không thể tải danh mục');
+      const cats = await catsRes.json();
+      if (Array.isArray(cats) && cats.length > 0) {
+        setCategories(cats);
+      }
+    } catch (_e) {
+      // Khi bot tắt hoặc lỗi kết nối, KHÔNG dùng fallback products.json
+      // mà đóng Mini App ngay để bảo vệ an toàn giao dịch
+      setBotOnline(false);
+      setOfflineReason('Không thể đồng bộ dữ liệu từ Bot Telegram.');
+      setCloseCountdown(5);
+    }
   }
 
+  // Khởi động kiểm tra sức khỏe bot và thiết lập Heartbeat 15 giây
   useEffect(() => {
-    loadData();
+    let isMounted = true;
+
+    async function initialCheck() {
+      const ok = await checkBotHealth();
+      if (ok && isMounted) {
+        loadData();
+      }
+    }
+
+    initialCheck();
+
+    // Heartbeat: định kỳ mỗi 15 giây kiểm tra lại xem Bot có còn hoạt động không
+    const heartbeat = setInterval(async () => {
+      const activeApi = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://ecfecaf60757b2.lhr.life');
+      if (!activeApi) return;
+      try {
+        const controller = new AbortController();
+        const tid = setTimeout(() => controller.abort(), 3500);
+        const res = await fetch(`${activeApi}/health`, {
+          headers: { 'bypass-tunnel-reminder': 'true' },
+          signal: controller.signal
+        });
+        clearTimeout(tid);
+        if (!res.ok) throw new Error('Health not ok');
+        const data = await res.json();
+        if (data.maintenanceMode || data.botActive === false) {
+          if (isMounted) {
+            setBotOnline(false);
+            setOfflineReason(data.maintenanceMode ? 'Hệ thống đang bảo trì.' : 'Bot Telegram đã tạm ngưng hoạt động.');
+            setCloseCountdown(5);
+          }
+        }
+      } catch (_e) {
+        if (isMounted) {
+          setBotOnline(false);
+          setOfflineReason('Bot Telegram đã ngưng hoạt động. Mini App tự động đóng.');
+          setCloseCountdown(5);
+        }
+      }
+    }, 15000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(heartbeat);
+    };
   }, [apiUrl]);
 
   // Lọc sản phẩm
@@ -582,7 +709,7 @@ export default function App() {
       return;
     }
 
-    const activeApi = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://4236d49d22d882.lhr.life');
+    const activeApi = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://ecfecaf60757b2.lhr.life');
     let backendSuccess = false;
     let deliveredKey = '';
     let newBal = profile.balance - price;
@@ -741,7 +868,7 @@ export default function App() {
   // ============================================================
   // ADMIN DASHBOARD HANDLERS (Sản phẩm, Người dùng, Đơn hàng)
   // ============================================================
-  const adminBaseUrl = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://4236d49d22d882.lhr.life');
+  const adminBaseUrl = apiUrl || (isLocalhost ? 'http://localhost:4000' : 'https://ecfecaf60757b2.lhr.life');
   const getAdminHeaders = () => ({
     'Content-Type': 'application/json',
     'x-admin-key': adminKey || 'hai1110',
@@ -1004,6 +1131,219 @@ export default function App() {
       showToast(err.message || 'Lỗi xuất dữ liệu');
     }
   };
+
+  // 1. Khi đang kiểm tra sức khỏe Bot Telegram lần đầu
+  if (botOnline === null) {
+    return (
+      <div style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 999999,
+        backgroundColor: '#0a0d14',
+        color: '#ffffff',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '24px 20px',
+        textAlign: 'center',
+        userSelect: 'none'
+      }}>
+        <div style={{
+          width: 46,
+          height: 46,
+          borderRadius: '50%',
+          border: '3px solid rgba(225, 29, 72, 0.2)',
+          borderTopColor: '#e11d48',
+          animation: 'spin 0.8s linear infinite',
+          marginBottom: 16
+        }} />
+        <div style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0' }}>
+          Đang kết nối hệ thống Shop Hai1110#...
+        </div>
+        <div style={{ fontSize: 12, color: '#64748b', marginTop: 6 }}>
+          Kiểm tra trạng thái Bot Telegram
+        </div>
+        <style>{`
+          @keyframes spin {
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
+      </div>
+    );
+  }
+
+  // 2. Khi Bot Telegram TẮT hoặc không hoạt động: MÀN HÌNH ĐÓNG MINI APP & TỰ ĐỘNG ĐÓNG
+  if (botOnline === false) {
+    return (
+      <div style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 999999,
+        backgroundColor: '#0a0d14',
+        backgroundImage: 'radial-gradient(ellipse 80% 50% at 50% -20%, rgba(239, 68, 68, 0.18), rgba(10, 13, 20, 0))',
+        color: '#ffffff',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '24px 20px',
+        textAlign: 'center',
+        userSelect: 'none',
+        fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+      }}>
+        <div style={{ position: 'relative', marginBottom: 20 }}>
+          <div style={{
+            width: 88,
+            height: 88,
+            borderRadius: '50%',
+            background: 'rgba(239, 68, 68, 0.12)',
+            border: '2px solid rgba(239, 68, 68, 0.35)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 42,
+            boxShadow: '0 0 35px rgba(239, 68, 68, 0.25)'
+          }}>
+            🔌
+          </div>
+          <span style={{
+            position: 'absolute',
+            bottom: -2,
+            right: -2,
+            width: 26,
+            height: 26,
+            borderRadius: '50%',
+            background: '#ef4444',
+            color: '#fff',
+            fontSize: 13,
+            fontWeight: 800,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: '2px solid #0a0d14'
+          }}>
+            ✕
+          </span>
+        </div>
+
+        <h1 style={{
+          fontSize: 20,
+          fontWeight: 800,
+          color: '#f87171',
+          marginBottom: 8,
+          letterSpacing: '-0.02em',
+          textTransform: 'uppercase'
+        }}>
+          Hệ Thống Đang Tạm Đóng
+        </h1>
+
+        <div style={{
+          maxWidth: 340,
+          background: 'rgba(30, 15, 20, 0.65)',
+          border: '1px solid rgba(239, 68, 68, 0.25)',
+          borderRadius: 14,
+          padding: '14px 16px',
+          marginBottom: 20
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#fca5a5', marginBottom: 4 }}>
+            ⚠️ Bot Telegram không hoạt động
+          </div>
+          <p style={{ fontSize: 12, color: '#9ca3af', lineHeight: 1.5, margin: 0 }}>
+            {offlineReason || 'Hệ thống Bot Telegram hiện đang tắt hoặc bảo trì. Mini App đã tạm thời đóng để đảm bảo an toàn giao dịch.'}
+          </p>
+        </div>
+
+        <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 22, fontWeight: 500 }}>
+          {closeCountdown > 0 ? (
+            <>Tự động đóng Mini App sau <strong style={{ color: '#f87171', fontSize: 15, fontFamily: 'monospace' }}>{closeCountdown}s</strong>...</>
+          ) : (
+            <span style={{ color: '#fbbf24' }}>Đang thực hiện đóng Mini App...</span>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', width: '100%', maxWidth: 280, gap: 10 }}>
+          <button
+            onClick={() => {
+              if (window.Telegram?.WebApp?.close) {
+                window.Telegram.WebApp.close();
+              } else if (typeof window !== 'undefined' && window.close) {
+                window.close();
+              }
+            }}
+            style={{
+              width: '100%',
+              padding: '12px 18px',
+              borderRadius: 12,
+              background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
+              color: '#ffffff',
+              border: 'none',
+              fontWeight: 700,
+              fontSize: 14,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              boxShadow: '0 4px 14px rgba(220, 38, 38, 0.4)'
+            }}
+          >
+            <span>🚪</span> Đóng Mini App ngay
+          </button>
+
+          <button
+            onClick={() => {
+              setBotOnline(null);
+              checkBotHealth(true).then((ok) => {
+                if (ok) loadData();
+              });
+            }}
+            style={{
+              width: '100%',
+              padding: '10px 18px',
+              borderRadius: 12,
+              background: 'rgba(255, 255, 255, 0.06)',
+              color: '#d1d5db',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              fontWeight: 600,
+              fontSize: 13,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8
+            }}
+          >
+            <span>🔄</span> Thử kết nối lại
+          </button>
+        </div>
+
+        {isLocalhost && (
+          <a
+            href="#admin"
+            onClick={(e) => {
+              e.preventDefault();
+              setBotOnline(true);
+              setAdminModalOpen(true);
+            }}
+            style={{
+              marginTop: 20,
+              fontSize: 11,
+              color: '#64748b',
+              textDecoration: 'underline',
+              cursor: 'pointer'
+            }}
+          >
+            ⚙️ Mở bảng Quản trị Admin (Localhost)
+          </a>
+        )}
+
+        <div style={{ marginTop: 24, fontSize: 11, color: '#64748b' }}>
+          Shop Hai1110# • Đồng bộ tự động theo trạng thái Bot Telegram
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>

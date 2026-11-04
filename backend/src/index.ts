@@ -19,6 +19,40 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const frontendDist = path.resolve(__dirname, '../../frontend/dist');
 let cachedBannerFileId: string | null = 'AgACAgUAAxkDAAONaujxZ7AYxVLdS8BsRlpbQy7PjHgAArEVaxvpqUlXhMkMVAy8jvYBAAMCAAN5AAM9BA';
+let isBotRunning = false;
+
+// ============================================================
+// SETTINGS VÀ QUẢN TRỊ TELEGRAM BOT TRÊN TRANG WEB ADMIN RIÊNG
+// ============================================================
+const SETTINGS_FILE = path.join(__dirname, '..', 'assets', 'settings.json');
+function loadStoreSettings() {
+  try {
+    if (fs.existsSync(SETTINGS_FILE)) {
+      return JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8'));
+    }
+  } catch {}
+  return {
+    bankId: '970436',
+    accountNo: 'HAI100TR',
+    accountName: 'NGUYEN HOANG HAI',
+    announcement: 'Chào mừng bạn đến với Shop Hai1110# — Hệ thống bán tài khoản & bản quyền tự động 24/7!',
+    maintenanceMode: false,
+    usdtRate: 25400,
+    webAppUrl: 'https://haiempirestore.github.io/bottesss/'
+  };
+}
+
+function saveStoreSettings(data: any) {
+  try {
+    const assetsDir = path.join(__dirname, '..', 'assets');
+    if (!fs.existsSync(assetsDir)) fs.mkdirSync(assetsDir, { recursive: true });
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(data, null, 2), 'utf-8');
+    return true;
+  } catch (e) {
+    console.error('Lỗi lưu settings:', e);
+    return false;
+  }
+}
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
@@ -48,7 +82,17 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '1mb', verify: (req: any, _res, buf) => { req.rawBody = buf.toString('utf8'); } }));
 app.use(rateLimit({ windowMs: 60_000, limit: 120 }));
-app.get('/health', (_req, res) => res.json({ ok: true }));
+app.get(['/health', '/api/health'], (_req, res) => {
+  const settings = loadStoreSettings();
+  const maintenance = Boolean(settings.maintenanceMode);
+  res.json({
+    ok: true,
+    botActive: isBotRunning,
+    maintenanceMode: maintenance,
+    message: maintenance ? 'Hệ thống đang tạm bảo trì' : (isBotRunning ? 'Bot đang hoạt động' : 'Bot đang khởi động'),
+    timestamp: Date.now()
+  });
+});
 
 app.post('/api/auth/telegram', async (req, res) => {
   try {
@@ -1211,36 +1255,6 @@ app.post('/api/admin/export-githubpage', adminAuth, async (_req, res) => {
 // ============================================================
 // SETTINGS VÀ QUẢN TRỊ TELEGRAM BOT TRÊN TRANG WEB ADMIN RIÊNG
 // ============================================================
-const SETTINGS_FILE = path.join(__dirname, '..', 'assets', 'settings.json');
-function loadStoreSettings() {
-  try {
-    if (fs.existsSync(SETTINGS_FILE)) {
-      return JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8'));
-    }
-  } catch {}
-  return {
-    bankId: '970436',
-    accountNo: 'HAI100TR',
-    accountName: 'NGUYEN HOANG HAI',
-    announcement: 'Chào mừng bạn đến với Shop Hai1110# — Hệ thống bán tài khoản & bản quyền tự động 24/7!',
-    maintenanceMode: false,
-    usdtRate: 25400,
-    webAppUrl: 'https://haiempirestore.github.io/bottesss/'
-  };
-}
-
-function saveStoreSettings(data: any) {
-  try {
-    const assetsDir = path.join(__dirname, '..', 'assets');
-    if (!fs.existsSync(assetsDir)) fs.mkdirSync(assetsDir, { recursive: true });
-    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(data, null, 2), 'utf-8');
-    return true;
-  } catch (e) {
-    console.error('Lỗi lưu settings:', e);
-    return false;
-  }
-}
-
 app.get('/api/settings', (_req, res) => {
   res.json(loadStoreSettings());
 });
@@ -2986,8 +3000,12 @@ if (botToken) {
 
   if ((process.env.BOT_MODE || 'polling') === 'polling') {
     bot.launch({ dropPendingUpdates: true }, () => {
+      isBotRunning = true;
       console.log('🤖 Telegram Bot đã khởi chạy polling thành công theo phong cách ML Oder (Shop Hai1110#)!');
-    }).catch(err => console.error('Bot launch failed', err));
+    }).catch(err => {
+      isBotRunning = false;
+      console.error('Bot launch failed', err);
+    });
   }
 }
 async function seedDefaultData() {
@@ -3077,5 +3095,13 @@ app.get(['/admin', '/admin.html', '/admin/*'], (_req, res, next) => {
 });
 
 app.listen(port, () => console.log(`API listening on ${port}`));
-process.once('SIGINT', () => bot?.stop('SIGINT'));
-process.once('SIGTERM', () => bot?.stop('SIGTERM'));
+process.once('SIGINT', () => {
+  isBotRunning = false;
+  bot?.stop('SIGINT');
+  process.exit(0);
+});
+process.once('SIGTERM', () => {
+  isBotRunning = false;
+  bot?.stop('SIGTERM');
+  process.exit(0);
+});
