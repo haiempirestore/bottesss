@@ -362,10 +362,8 @@
         "createdAt": "2026-11-02T18:31:40.622Z",
         "updatedAt": "2026-11-04T19:41:50.576Z"
       },
-      "stockCount": 1,
-      "stockItems": [
-        "capcut_pro_vip_sub_code_1110_backup"
-      ]
+      "stockCount": 0,
+      "stockItems": []
     },
     {
       "id": "cmvzli7ve000rdlsbstaoxzwq",
@@ -511,5 +509,5 @@
       ]
     }
   ],
-  "updatedAt": "2026-11-04T20:16:32.651Z"
+  "updatedAt": "2026-11-09T00:58:45.142Z"
 }
