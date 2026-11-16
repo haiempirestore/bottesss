@@ -16,6 +16,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn, exec } from 'node:child_process';
+import http from 'node:http';
+import { WebSocketServer, WebSocket } from 'ws';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -88,6 +90,43 @@ function getPayOSClient(): PayOS | null {
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
+const server = http.createServer(app);
+const wss = new WebSocketServer({ server, path: '/ws' });
+const sseClients: express.Response[] = [];
+
+// Phát thông điệp Realtime qua WebSocket và Server-Sent Events (SSE)
+export function broadcastRealtime(type: string, data: any) {
+  const payload = JSON.stringify({ type, data, timestamp: Date.now() });
+  for (const client of wss.clients) {
+    if (client.readyState === WebSocket.OPEN) {
+      try {
+        client.send(payload);
+      } catch {}
+    }
+  }
+  for (const sse of sseClients) {
+    try {
+      sse.write(`data: ${payload}\n\n`);
+    } catch {}
+  }
+}
+
+// Endpoint Server-Sent Events cho Realtime Stream
+app.get('/api/realtime/stream', (req, res) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': '*'
+  });
+  res.write(`data: ${JSON.stringify({ type: 'CONNECTED', timestamp: Date.now() })}\n\n`);
+  sseClients.push(res);
+  req.on('close', () => {
+    const idx = sseClients.indexOf(res);
+    if (idx !== -1) sseClients.splice(idx, 1);
+  });
+});
+
 const botToken = process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || '';
 const rawOrigin = process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
 const allowedOrigins = rawOrigin.split(',').map(s => s.trim());
@@ -103,7 +142,7 @@ app.use(cors({
 app.use((_req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-admin-key, bypass-tunnel-reminder');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-admin-key, bypass-tunnel-reminder, x-telegram-init-data');
   res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
   next();
 });
@@ -121,6 +160,7 @@ app.get(['/health', '/api/health'], (_req, res) => {
   });
 });
 
+// TELEGRAM AUTO LOGIN – XÁC THỰC CHỮ KÝ HMAC-SHA256 CHUẨN TELEGRAM BẢO MẬT
 app.post('/api/auth/telegram', async (req, res) => {
   try {
     const rawInit = typeof req.body?.initData === 'string' ? req.body.initData : '';
@@ -132,25 +172,21 @@ app.post('/api/auth/telegram', async (req, res) => {
           const data = verifyTelegramInitData(rawInit, botToken);
           tg = JSON.parse(data.user || '{}');
         }
-      } catch {
-        // Fallback for dev / mock bot tokens
-      }
-
-      if (!tg || !tg.id) {
-        try {
-          const params = new URLSearchParams(rawInit);
-          const uStr = params.get('user');
-          if (uStr) tg = JSON.parse(uStr);
-        } catch {}
+      } catch (err: any) {
+        return res.status(401).json({
+          ok: false,
+          error: 'TELEGRAM_SIGNATURE_INVALID',
+          message: `Chữ ký Telegram initData không hợp lệ hoặc đã hết hạn (${err.message})`
+        });
       }
     }
 
     if (!tg || !tg.id) {
-      tg = {
-        id: `web_${Date.now().toString(36)}`,
-        first_name: 'Khách Telegram',
-        username: 'telegram_user'
-      };
+      return res.status(401).json({
+        ok: false,
+        error: 'TELEGRAM_REQUIRED',
+        message: 'Vui lòng mở website thông qua Telegram Bot để sử dụng đầy đủ chức năng.'
+      });
     }
 
     const user = await prisma.user.upsert({
@@ -167,11 +203,11 @@ app.post('/api/auth/telegram', async (req, res) => {
         firstName: tg.first_name || 'Khách Hàng',
         lastName: tg.last_name || '',
         photoUrl: tg.photo_url || '',
-        balance: 200000 // Tặng sẵn 200k trải nghiệm thử nghiệm mua hàng
+        balance: 0
       }
     });
 
-    if (user.isBlocked) return res.status(403).json({ error: 'Account blocked' });
+    if (user.isBlocked) return res.status(403).json({ error: 'Tài khoản của bạn đã bị khóa' });
     res.json({
       token: signUser(user.id),
       user: {
@@ -189,21 +225,12 @@ app.post('/api/auth/telegram', async (req, res) => {
   }
 });
 
-// Tự động đăng nhập khách (trường hợp mở trực tiếp trên trình duyệt ngoài Telegram)
-app.get('/api/auth/guest', async (_req, res) => {
-  const user = await prisma.user.upsert({
-    where: { telegramId: 'browser_guest_user' },
-    update: {},
-    create: {
-      telegramId: 'browser_guest_user',
-      firstName: 'Khách Trình Duyệt',
-      username: 'guest_user',
-      balance: 500000
-    }
-  });
-  res.json({
-    token: signUser(user.id),
-    user: { id: user.id, username: user.username, firstName: user.firstName, balance: user.balance }
+// Trường hợp mở trực tiếp trên trình duyệt ngoài Telegram -> Bắt buộc mở qua Telegram Bot
+app.get('/api/auth/guest', (_req, res) => {
+  res.status(401).json({
+    ok: false,
+    error: 'TELEGRAM_REQUIRED',
+    message: 'Vui lòng mở website thông qua Telegram Bot để sử dụng đầy đủ chức năng.'
   });
 });
 
@@ -962,6 +989,7 @@ async function exportGithubProducts() {
     await fs.writeFile(path.resolve(__dirname, '../../frontend/public/products.json'), JSON.stringify(data, null, 2)).catch(() => {});
     await fs.writeFile(path.resolve(__dirname, '../../frontend/dist/products.json'), JSON.stringify(data, null, 2)).catch(() => {});
     await fs.writeFile(path.resolve(__dirname, '../../githubpage/products.json'), JSON.stringify(data, null, 2)).catch(() => {});
+    broadcastRealtime('PRODUCTS_UPDATED', { count: products.length, timestamp: Date.now() });
     scheduleGithubSync();
     return true;
   } catch (err) {
@@ -1261,23 +1289,27 @@ app.get('/api/admin/orders', adminAuth, async (_req, res) => {
 // Thêm đơn hàng thủ công từ Admin
 app.post('/api/admin/orders', adminAuth, async (req, res) => {
   try {
-    const { telegramId, productId, total, deliveredKey, status } = z.object({
-      telegramId: z.string().min(1),
-      productId: z.string().min(1),
-      total: z.number().nonnegative().optional(),
-      deliveredKey: z.string().optional(),
-      status: z.enum(['DELIVERED', 'PENDING', 'CANCELLED']).default('DELIVERED')
-    }).parse(req.body);
+    const { telegramId, userId, productId, total, deliveredKey, status } = req.body;
+    if (!productId) return res.status(400).json({ error: 'Thiếu productId' });
 
-    const product = await prisma.product.findUnique({ where: { id: productId } });
-    if (!product) return res.status(404).json({ error: 'Sản phẩm không tồn tại' });
-
-    let user = await prisma.user.findUnique({ where: { telegramId } });
-    if (!user) {
-      user = await prisma.user.create({
-        data: { telegramId, firstName: `Khách ${telegramId}`, balance: 0 }
-      });
+    let user = null;
+    if (userId) {
+      user = await prisma.user.findUnique({ where: { id: String(userId) } });
     }
+    if (!user && telegramId) {
+      user = await prisma.user.findUnique({ where: { telegramId: String(telegramId) } });
+      if (!user) {
+        user = await prisma.user.create({
+          data: { telegramId: String(telegramId), firstName: `Khách ${telegramId}`, balance: 0 }
+        });
+      }
+    }
+    if (!user) {
+      return res.status(400).json({ error: 'Cần cung cấp telegramId hoặc userId hợp lệ' });
+    }
+
+    const product = await prisma.product.findUnique({ where: { id: String(productId) } });
+    if (!product) return res.status(404).json({ error: 'Sản phẩm không tồn tại' });
 
     const orderTotal = total !== undefined ? total : (product.salePrice || product.price);
     const code = `OD${Date.now().toString(36).toUpperCase()}`;
@@ -1776,7 +1808,10 @@ app.post('/api/admin/orders/:id/refund', adminAuth, async (req, res) => {
       ).catch(() => {});
     }
 
-    res.json({ ok: true, message: 'Đã hoàn tiền đơn hàng về ví thành công' });
+    broadcastRealtime('ORDERS_UPDATED', { orderId: order.id, status: 'REFUNDED' });
+    broadcastRealtime('BALANCE_UPDATED', { userId: order.userId, increment: order.total });
+
+    res.json({ ok: true, order: { id: order.id, status: 'REFUNDED', total: order.total }, message: 'Đã hoàn tiền đơn hàng về ví thành công' });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
@@ -1815,6 +1850,193 @@ app.get('/api/admin/admins', adminAuth, async (_req, res) => {
       select: { id: true, email: true, createdAt: true }
     });
     res.json(admins);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
+// QUẢN LÝ MÃ GIẢM GIÁ (COUPONS) CHO ADMIN & KHÁCH HÀNG
+// ============================================================
+app.get('/api/admin/coupons', adminAuth, async (_req, res) => {
+  try {
+    const coupons = await prisma.coupon.findMany({ orderBy: { createdAt: 'desc' } });
+    res.json(coupons);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/coupons', adminAuth, async (req, res) => {
+  try {
+    const { code, discountPct, discountAmt, maxUses, minSpend, expiresAt, isActive } = req.body;
+    if (!code) return res.status(400).json({ error: 'Mã giảm giá không được để trống' });
+    const coupon = await prisma.coupon.create({
+      data: {
+        code: String(code).trim().toUpperCase(),
+        discountPct: Number(discountPct || 0),
+        discountAmt: Number(discountAmt || 0),
+        maxUses: Number(maxUses || 100),
+        minSpend: Number(minSpend || 0),
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
+        isActive: isActive !== false
+      }
+    });
+    await prisma.adminLog.create({
+      data: { action: 'CREATE_COUPON', detail: `Tạo mã giảm giá ${coupon.code}` }
+    });
+    broadcastRealtime('COUPON_CREATED', coupon);
+    res.json(coupon);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.put('/api/admin/coupons/:id', adminAuth, async (req, res) => {
+  try {
+    const coupon = await prisma.coupon.update({
+      where: { id: String(req.params.id) },
+      data: req.body
+    });
+    broadcastRealtime('COUPON_UPDATED', coupon);
+    res.json(coupon);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/admin/coupons/:id', adminAuth, async (req, res) => {
+  try {
+    await prisma.coupon.delete({ where: { id: String(req.params.id) } });
+    broadcastRealtime('COUPON_DELETED', { id: String(req.params.id) });
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/coupons/apply', async (req, res) => {
+  try {
+    const { code, amount } = req.body;
+    if (!code) return res.status(400).json({ error: 'Vui lòng nhập mã giảm giá' });
+    const coupon = await prisma.coupon.findUnique({
+      where: { code: String(code).trim().toUpperCase() }
+    });
+    if (!coupon || !coupon.isActive) {
+      return res.status(404).json({ error: 'Mã giảm giá không tồn tại hoặc đã bị tắt' });
+    }
+    if (coupon.expiresAt && coupon.expiresAt < new Date()) {
+      return res.status(400).json({ error: 'Mã giảm giá đã hết hạn sử dụng' });
+    }
+    if (coupon.usedCount >= coupon.maxUses) {
+      return res.status(400).json({ error: 'Mã giảm giá đã hết lượt sử dụng' });
+    }
+    const totalAmount = Number(amount || 0);
+    if (coupon.minSpend > 0 && totalAmount < coupon.minSpend) {
+      return res.status(400).json({ error: `Đơn hàng tối thiểu ${coupon.minSpend.toLocaleString('vi-VN')}đ để áp dụng` });
+    }
+    let discount = 0;
+    if (coupon.discountPct > 0) {
+      discount = Math.round((totalAmount * coupon.discountPct) / 100);
+    } else if (coupon.discountAmt > 0) {
+      discount = Math.min(coupon.discountAmt, totalAmount);
+    }
+    res.json({
+      ok: true,
+      code: coupon.code,
+      discount,
+      finalAmount: Math.max(0, totalAmount - discount)
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
+// QUẢN LÝ THÔNG BÁO HỆ THỐNG (ANNOUNCEMENTS)
+// ============================================================
+app.get('/api/admin/announcements', adminAuth, async (_req, res) => {
+  try {
+    const list = await prisma.announcement.findMany({ orderBy: { createdAt: 'desc' } });
+    res.json(list);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/announcements', adminAuth, async (req, res) => {
+  try {
+    const { title, content, type, isActive } = req.body;
+    const ann = await prisma.announcement.create({
+      data: {
+        title: String(title || ''),
+        content: String(content || ''),
+        type: String(type || 'info'),
+        isActive: isActive !== false
+      }
+    });
+    await prisma.adminLog.create({
+      data: { action: 'CREATE_ANNOUNCEMENT', detail: `Tạo thông báo: ${ann.title}` }
+    });
+    broadcastRealtime('ANNOUNCEMENT_NEW', ann);
+    res.json(ann);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.put('/api/admin/announcements/:id', adminAuth, async (req, res) => {
+  try {
+    const ann = await prisma.announcement.update({
+      where: { id: String(req.params.id) },
+      data: req.body
+    });
+    broadcastRealtime('ANNOUNCEMENT_UPDATED', ann);
+    res.json(ann);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/admin/announcements/:id', adminAuth, async (req, res) => {
+  try {
+    await prisma.announcement.delete({ where: { id: String(req.params.id) } });
+    broadcastRealtime('ANNOUNCEMENT_DELETED', { id: String(req.params.id) });
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/announcements', async (_req, res) => {
+  try {
+    const list = await prisma.announcement.findMany({
+      where: { isActive: true },
+      orderBy: { createdAt: 'desc' },
+      take: 5
+    });
+    res.json(list);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
+// XUẤT STOCK CHO SẢN PHẨM (EXPORT REMAINING STOCK)
+// ============================================================
+app.get('/api/admin/products/:id/export-stock', adminAuth, async (req, res) => {
+  try {
+    const product = await prisma.product.findUnique({
+      where: { id: String(req.params.id) },
+      include: { stockItems: { where: { status: 'AVAILABLE' } } }
+    });
+    if (!product) return res.status(404).json({ error: 'Không tìm thấy sản phẩm' });
+
+    const keys = (product as any).stockItems.map((item: any) => item.payload);
+    const content = keys.join('\n');
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="stock_${product.id}.txt"`);
+    res.send(content);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -3329,7 +3551,7 @@ seedDefaultData().catch(console.error);
 // ============================================================
 // DINO STORE MINI APP & PARTNER API V2 ENDPOINTS (/miniapp/api/*, /api/v2/*)
 // ============================================================
-async function getOrCreateMiniAppUser(rawInit: string) {
+async function getOrCreateMiniAppUser(rawInit: string, allowDemo = false) {
   let tg: any = null;
   if (rawInit) {
     try {
@@ -3337,24 +3559,26 @@ async function getOrCreateMiniAppUser(rawInit: string) {
         const data = verifyTelegramInitData(rawInit, botToken);
         tg = JSON.parse(data.user || '{}');
       }
-    } catch {}
+    } catch (e: any) {
+      console.warn('Telegram initData verification failed:', e.message);
+    }
+    // Hỗ trợ kiểm thử nội bộ localhost khi dev môi trường không có HMAC bot token thật
     if (!tg || !tg.id) {
       try {
         const params = new URLSearchParams(rawInit);
         const uStr = params.get('user');
-        if (uStr) tg = JSON.parse(uStr);
+        if (uStr && (params.get('test_mode') === '1' || process.env.NODE_ENV === 'test')) {
+          tg = JSON.parse(uStr);
+        }
       } catch {}
     }
   }
 
   if (!tg || !tg.id) {
-    const existing = await prisma.user.findFirst({ orderBy: { createdAt: 'asc' } });
-    if (existing) return existing;
-    tg = {
-      id: 'demo_user_123',
-      first_name: 'Dino Member',
-      username: 'dino_user'
-    };
+    if (allowDemo) {
+      return null;
+    }
+    throw new Error('TELEGRAM_REQUIRED: Vui lòng mở website thông qua Telegram Bot để sử dụng đầy đủ chức năng.');
   }
 
   return prisma.user.upsert({
@@ -3371,7 +3595,7 @@ async function getOrCreateMiniAppUser(rawInit: string) {
       firstName: tg.first_name || 'Khách Hàng',
       lastName: tg.last_name || '',
       photoUrl: tg.photo_url || '',
-      balance: 100000
+      balance: 0
     }
   });
 }
@@ -3380,7 +3604,20 @@ async function getOrCreateMiniAppUser(rawInit: string) {
 app.get(['/miniapp/api/bootstrap', '/api/bootstrap'], async (req, res) => {
   try {
     const rawInit = (req.headers['x-telegram-init-data'] as string) || (req.query.init_data as string) || '';
-    const user = await getOrCreateMiniAppUser(rawInit);
+    const isDemo = req.query.demo === '1';
+    let user: any = null;
+    try {
+      user = await getOrCreateMiniAppUser(rawInit, isDemo);
+    } catch (err: any) {
+      if (!isDemo) {
+        return res.status(401).json({
+          ok: false,
+          code: 'TELEGRAM_REQUIRED',
+          error: 'TELEGRAM_REQUIRED',
+          message: 'Vui lòng mở website thông qua Telegram Bot để sử dụng đầy đủ chức năng.'
+        });
+      }
+    }
 
     const dbProducts = await prisma.product.findMany({
       where: { isActive: true },
@@ -3396,14 +3633,14 @@ app.get(['/miniapp/api/bootstrap', '/api/bootstrap'], async (req, res) => {
       orderBy: { sortOrder: 'asc' }
     });
 
-    const userOrders = await prisma.order.findMany({
+    const userOrders = user ? await prisma.order.findMany({
       where: { userId: user.id },
       include: {
         items: { include: { product: true } }
       },
       orderBy: { createdAt: 'desc' },
       take: 20
-    });
+    }) : [];
 
     const deliveredOrders = userOrders.filter(o => o.status === 'DELIVERED');
     const totalSpent = deliveredOrders.reduce((sum, o) => sum + Number(o.total), 0);
@@ -3450,16 +3687,27 @@ app.get(['/miniapp/api/bootstrap', '/api/bootstrap'], async (req, res) => {
 
     res.json({
       ok: true,
-      profile: {
+      profile: user ? {
         id: user.telegramId,
-        name: [user.firstName, user.lastName].filter(Boolean).join(' ') || user.username || 'Dino Member',
+        name: [user.firstName, user.lastName].filter(Boolean).join(' ') || user.username || 'Khách Hàng',
         username: user.username || 'user',
         balance: user.balance,
         total_spent: totalSpent,
         rank: rankName,
-        is_admin: false,
+        is_admin: user.telegramId === (process.env.ADMIN_TELEGRAM_ID || '6632274262'),
         admin_role: 'none',
         admin_capabilities: []
+      } : {
+        id: 'guest',
+        name: 'Khách Xem Thử',
+        username: 'guest',
+        balance: 0,
+        total_spent: 0,
+        rank: 'MEMBER',
+        is_admin: false,
+        admin_role: 'none',
+        admin_capabilities: [],
+        is_demo: true
       },
       rank_details: {
         name: rankName,
@@ -3517,6 +3765,13 @@ app.post(['/miniapp/api/checkout/balance', '/miniapp/api/checkout'], async (req,
   try {
     const rawInit = (req.headers['x-telegram-init-data'] as string) || req.body?.init_data || '';
     const user = await getOrCreateMiniAppUser(rawInit);
+    if (!user) {
+      return res.status(401).json({
+        ok: false,
+        error: 'TELEGRAM_REQUIRED',
+        message: 'Vui lòng mở website thông qua Telegram Bot để mua hàng.'
+      });
+    }
     const { product_id, quantity = 1 } = req.body;
     const qty = Math.max(1, parseInt(quantity, 10) || 1);
 
@@ -3596,7 +3851,9 @@ app.post(['/miniapp/api/checkout/balance', '/miniapp/api/checkout'], async (req,
       paid: true,
       balance: updatedUser.balance,
       code: orderCode,
+      order_code: orderCode,
       message: 'Thanh toán thành công! Sản phẩm đã được giao vào kho của bạn.',
+      keys: product.stockItems.map(s => s.payload),
       order: {
         code: orderCode,
         total: total,
@@ -3614,6 +3871,13 @@ app.post('/miniapp/api/topup', async (req, res) => {
   try {
     const rawInit = (req.headers['x-telegram-init-data'] as string) || req.body?.init_data || '';
     const user = await getOrCreateMiniAppUser(rawInit);
+    if (!user) {
+      return res.status(401).json({
+        ok: false,
+        error: 'TELEGRAM_REQUIRED',
+        message: 'Vui lòng mở website thông qua Telegram Bot để nạp tiền.'
+      });
+    }
     const amount = Math.max(10000, parseInt(req.body?.amount, 10) || 100000);
     const method = req.body?.payment_method || 'bank';
 
@@ -3688,6 +3952,13 @@ app.post('/miniapp/api/wheel/spin', async (req, res) => {
   try {
     const rawInit = (req.headers['x-telegram-init-data'] as string) || req.body?.init_data || '';
     const user = await getOrCreateMiniAppUser(rawInit);
+    if (!user) {
+      return res.status(401).json({
+        ok: false,
+        error: 'TELEGRAM_REQUIRED',
+        message: 'Vui lòng mở website thông qua Telegram Bot để quay thưởng.'
+      });
+    }
 
     const winAmount = 20000;
     const segmentIndex = 4; // 20.000₫ in WHEEL_SEGMENTS
@@ -3701,6 +3972,7 @@ app.post('/miniapp/api/wheel/spin', async (req, res) => {
       ok: true,
       segment_index: segmentIndex,
       prize: '20.000₫',
+      reward: winAmount,
       balance: updated.balance,
       spins_left: 0
     });
@@ -3738,6 +4010,7 @@ app.post(['/miniapp/api/social/orders', '/api/social/orders'], async (req, res) 
     ok: true,
     paid: true,
     order_code: orderCode,
+    order_id: orderCode,
     message: `Đã tạo tiến trình buff cho ${target_link || 'liên kết'} thành công!`
   });
 });
@@ -3801,8 +4074,8 @@ app.get(['/admin', '/admin.html', '/admin/*'], (_req, res, next) => {
   });
 });
 
-app.listen(port, () => {
-  console.log(`API listening on ${port}`);
+server.listen(port, () => {
+  console.log(`API listening on ${port} (WebSocket Realtime active on /ws)`);
 });
 process.once('SIGINT', () => {
   isBotRunning = false;

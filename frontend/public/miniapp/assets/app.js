@@ -2638,6 +2638,44 @@
     window.location.href = '/miniapp/baotri.html';
   }
 
+  function showTelegramRequiredNotice() {
+    clearCachedBootstrap();
+    state.data = null;
+    const loading = $('#loading');
+    if (loading) loading.hidden = true;
+    const content = $('#content');
+    if (content) content.hidden = true;
+    const bottomNav = $('#bottomNav');
+    if (bottomNav) bottomNav.hidden = true;
+    $('#app')?.setAttribute('aria-busy', 'false');
+
+    let notice = $('#telegramRequiredNotice');
+    if (!notice) {
+      notice = document.createElement('div');
+      notice.id = 'telegramRequiredNotice';
+      notice.className = 'telegram-required-modal';
+      notice.innerHTML = `
+        <div class="telegram-required-card">
+          <div class="tg-icon-badge">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8-1.5 7.1c-.11.5-.41.62-.83.39l-2.29-1.69-1.1 1.06c-.12.12-.22.22-.45.22l.16-2.33 4.25-3.84c.18-.16-.04-.25-.28-.09l-5.25 3.3-2.26-.71c-.49-.15-.5-.49.1-.73l8.84-3.41c.41-.15.77.1.66.72z"/>
+            </svg>
+          </div>
+          <h2>Yêu Cầu Truy Cập Qua Telegram</h2>
+          <p class="tg-notice-desc">Vui lòng mở website thông qua <b>Telegram Bot</b> để sử dụng đầy đủ chức năng.</p>
+          <div class="tg-notice-actions">
+            <a href="https://t.me/tainguyenhai1110_bot" class="tg-open-bot-btn" target="_blank" rel="noopener">
+              <span>🚀 Mở Bot @tainguyenhai1110_bot</span>
+            </a>
+            <a href="?demo=1" class="tg-demo-link">Xem trước sản phẩm (Chế độ Demo)</a>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(notice);
+    }
+    notice.hidden = false;
+  }
+
   const BOOTSTRAP_CACHE_MAX_AGE_MS = 3 * 60 * 1000; // 3 phút tối đa để tránh dữ liệu tồn đọng quá cũ
   function getCachedBootstrap() {
     try {
@@ -2772,6 +2810,10 @@
     } catch { }
 
     const isDemo = new URLSearchParams(location.search).get('demo') === '1';
+    if (!tg?.initData && !isDemo) {
+      showTelegramRequiredNotice();
+      return;
+    }
     const cached = !isDemo ? getCachedBootstrap() : null;
     let hasRenderedCached = false;
     if (cached) {

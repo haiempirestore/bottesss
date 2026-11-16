@@ -132,3 +132,26 @@ model AdminLog {
   detail    String?
   createdAt DateTime @default(now())
 }
+
+model Coupon {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  discountPct Float     @default(0)
+  discountAmt Float     @default(0)
+  maxUses     Int       @default(100)
+  usedCount   Int       @default(0)
+  minSpend    Float     @default(0)
+  isActive    Boolean   @default(true)
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+model Announcement {
+  id          String   @id @default(cuid())
+  title       String
+  content     String
+  type        String   @default("info")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+}
+

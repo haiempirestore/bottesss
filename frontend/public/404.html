@@ -1,0 +1,1029 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#080B11">
+  <title>Dino Store</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="./config.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="./miniapp/assets/app.css?v=20261112-ss2">
+  <!-- Master Design System consolidated in app.css -->
+</head>
+<body>
+  <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
+  <main id="app" class="app-shell" aria-busy="true">
+    <header class="topbar">
+      <button class="brand" data-go="home" aria-label="Dino Store - Trang chủ">
+        <span class="brand-mark"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 18.5C7 10.2 12.6 5 20.8 5c1.7 0 3.4.3 4.8.8l-3.2 3.4 4.7 2.3-4.8 2.1c.5 5.5-3.2 10.8-9.4 11.5-2.8.3-5-.4-6.6-1.5 2.8-.2 4.7-1.8 5.4-3.7-1.7.2-3.3-.3-4.7-1.4Z"/><circle cx="19.5" cy="10.4" r="1.3"/><path class="brand-cut" d="M11.7 16.5c2.2.3 4.3-.2 5.6-1.4"/></svg></span>
+        <span><strong>DINO</strong><small>DIGITAL STORE</small></span>
+      </button>
+      <div class="top-actions">
+        <button class="icon-button" id="searchButton" aria-label="Tìm kiếm"><i data-icon="search"></i></button>
+        <button class="icon-button lang-button" id="languageButton" type="button" aria-label="Đổi ngôn ngữ"><span><svg width="17" height="12" viewBox="0 0 30 20" style="vertical-align:-1px;border-radius:2px;margin-right:4px"><rect width="30" height="20" fill="#da251d"/><polygon points="15,4 16.5,8.5 21.2,8.5 17.4,11.3 18.8,15.8 15,13 11.2,15.8 12.6,11.3 8.8,8.5 13.5,8.5" fill="#ffff00"/></svg>VI</span></button>
+        <button class="avatar-button" data-go="profile" aria-label="Tài khoản"><span id="avatarText">D</span><b class="online-dot"></b></button>
+      </div>
+    </header>
+
+    <section id="loading" class="loading-view">
+      <div class="loading-logo"><span class="brand-mark large"><svg viewBox="0 0 32 32"><path d="M7 18.5C7 10.2 12.6 5 20.8 5c1.7 0 3.4.3 4.8.8l-3.2 3.4 4.7 2.3-4.8 2.1c.5 5.5-3.2 10.8-9.4 11.5-2.8.3-5-.4-6.6-1.5 2.8-.2 4.7-1.8 5.4-3.7-1.7.2-3.3-.3-4.7-1.4Z"/></svg></span></div>
+      <p>Đang mở cửa hàng...</p><div class="loading-line"><span></span></div>
+    </section>
+
+    <div id="content" hidden>
+      <section class="page active" data-page="home">
+        <div class="welcome-row"><div><p class="eyebrow">CHÀO MỪNG TRỞ LẠI</p><h1>Xin chào, <span id="welcomeName">Bạn</span> <span class="wave">✦</span></h1></div><button class="mini-chip" data-go="profile"><i data-icon="crown"></i><span id="rankText">MEMBER</span></button></div>
+
+        <article class="wallet-card">
+          <div class="wallet-grid"></div><div class="wallet-glow"></div>
+          <div class="wallet-head"><span>SỐ DƯ KHẢ DỤNG</span><button id="currencyToggleBtn" class="currency-toggle-chip" type="button" aria-label="Toggle currency"><span id="currencyToggleLabel">VND</span> ⇄ USDT</button></div>
+          <div class="wallet-balance"><strong id="balanceText">0</strong><small id="currencyUnit">₫</small></div>
+          <div class="wallet-foot"><div><small>Tổng chi tiêu</small><b id="spentText">0 ₫</b></div><button id="topupButton"><i data-icon="plus"></i>Nạp tiền</button></div>
+        </article>
+
+        <div class="quick-grid">
+          <button id="openWheel" type="button"><span class="quick-icon gold"><i data-icon="gift"></i><span class="folder-count wheel-count" id="wheelBadge" hidden>0</span></span><b>Vòng quay</b></button>
+          <button id="openCart" type="button"><span class="quick-icon green"><i data-icon="cart"></i><span class="folder-count cart-count" id="cartCount" hidden>0</span></span><b>Giỏ hàng</b></button>
+          <button class="social-folder-link" data-go="social" type="button"><span class="quick-icon social"><i data-icon="users"></i></span><b>Social Media</b></button>
+          <button data-go="netflix" id="openNetflix" type="button"><span class="quick-icon flame"><i data-icon="zap"></i></span><b>Netflix VIP</b></button>
+          <button id="openReport" type="button" data-action="report" onclick="if(window.openWarranty)window.openWarranty()"><span class="quick-icon rose"><i data-icon="shield"></i></span><b>Báo lỗi đơn</b></button>
+          <button type="button" data-action="support"><span class="quick-icon blue"><i data-icon="message"></i></span><b>Hỗ trợ 24/7</b></button>
+          <button data-go="tools" type="button"><span class="quick-icon violet"><i data-icon="tool"></i></span><b>Tiện ích MMO</b></button>
+          <button class="admin-entry social-folder-link" data-go="admin" data-admin-only type="button" hidden><span class="quick-icon green"><i data-icon="shield"></i></span><b>Quản trị</b></button>
+        </div>
+
+        <div class="live-orders-ticker" id="liveOrdersTicker">
+          <div class="ticker-badge"><span class="ticker-dot"></span><span>VỪA MUA</span></div>
+          <div class="ticker-viewport">
+            <div class="ticker-track" id="tickerTrack"></div>
+          </div>
+        </div>
+
+        <section class="section-block">
+          <div class="section-heading"><div><span class="live-badge"><i></i>ĐANG HOT</span><h2>Sản phẩm nổi bật</h2></div><button data-go="shop">Xem tất cả <i data-icon="arrow"></i></button></div>
+          <div id="featuredProducts" class="featured-scroll"></div>
+        </section>
+
+        <section class="section-block growth-section" id="recommendationSection" hidden><div class="section-heading"><div><span class="live-badge"><i></i>DÀNH CHO BẠN</span><h2>Gợi ý phù hợp</h2></div></div><div id="recommendedProducts" class="featured-scroll"></div></section>
+        <section class="section-block growth-section" id="recentSection" hidden><div class="section-heading"><div><span class="live-badge"><i></i>VỪA XEM</span><h2>Xem lại nhanh</h2></div></div><div id="recentProducts" class="featured-scroll"></div></section>
+
+        <section class="trust-strip"><div><i data-icon="zap"></i><span><b>Giao tự động</b><small>Chỉ trong vài giây</small></span></div><div><i data-icon="shield"></i><span><b>Bảo hành rõ ràng</b><small>Theo từng sản phẩm</small></span></div></section>
+      </section>
+
+      <section class="page" data-page="shop">
+        <div class="page-title"><div><p class="eyebrow">DINO MARKET</p><h1>Khám phá sản phẩm</h1></div><span id="productCount" class="count-pill">0 SP</span></div>
+        <div class="search-box"><i data-icon="search"></i><input id="searchInput" type="search" placeholder="Tìm ChatGPT, Canva, Netflix..." autocomplete="off" aria-label="Tìm sản phẩm"><button id="clearSearch" aria-label="Xóa tìm kiếm">×</button></div>
+        <div id="categoryChips" class="category-scroll"></div>
+        <div class="catalog-toolbar"><span id="catalogLabel">Tất cả sản phẩm</span><button id="sortButton"><i data-icon="sort"></i>Phổ biến</button></div>
+        <div id="productGrid" class="product-grid"></div>
+        <div id="emptyProducts" class="empty-state" hidden><span><i data-icon="search"></i></span><h3>Chưa tìm thấy sản phẩm</h3><p>Thử một từ khóa hoặc danh mục khác nhé.</p></div>
+      </section>
+
+      <section class="page" data-page="social" id="smmPage">
+        <!-- SMM Hero & Wallet Bar -->
+        <div class="smm-hero">
+          <div class="smm-hero-content">
+            <div class="smm-hero-badge"><span class="smm-live-dot"></span><span>DINO SMM PANEL · V2.4</span></div>
+            <h1>Buff Tương Tác Tự Động</h1>
+            <p>Tăng Like, Follow, View, Comment, Mắt Live đa nền tảng siêu tốc qua hệ thống API trực tiếp.</p>
+          </div>
+          <div class="smm-wallet-bar">
+            <div class="smm-wallet-info">
+              <span class="smm-wallet-icon"><i data-icon="wallet"></i></span>
+              <div>
+                <small>SỐ DƯ KHẢ DỤNG</small>
+                <strong id="smmWalletBalance">0 ₫</strong>
+              </div>
+            </div>
+            <button class="smm-topup-btn" id="smmTopupBtn" type="button"><i data-icon="plus"></i><span>Nạp ví</span></button>
+          </div>
+        </div>
+
+        <!-- SMM Sub-Tabs -->
+        <div class="smm-nav-tabs">
+          <button class="smm-nav-tab active" data-smm-tab="order" type="button">
+            <i data-icon="zap"></i><span>Đặt đơn</span>
+          </button>
+          <button class="smm-nav-tab" data-smm-tab="tracking" type="button">
+            <i data-icon="clock"></i><span>Tiến độ</span>
+            <span class="smm-badge-count" id="smmTrackingBadge" hidden>0</span>
+          </button>
+          <button class="smm-nav-tab" data-smm-tab="pricing" type="button">
+            <i data-icon="receipt"></i><span>Bảng giá</span>
+          </button>
+        </div>
+
+        <!-- ==================== SUB-TAB 1: TẠO ĐƠN BUFF ==================== -->
+        <div id="smmOrderView" class="smm-subview active">
+          <!-- Platform Dock -->
+          <div class="smm-section-label">1. CHỌN MẠNG XÃ HỘI</div>
+          <div class="smm-platform-dock" id="smmPlatformDock">
+            <button class="smm-platform-btn active" data-smm-platform="all" type="button">
+              <span class="smm-p-icon all"><i data-icon="grid"></i></span>
+              <b>Tất cả</b>
+            </button>
+            <button class="smm-platform-btn" data-smm-platform="Facebook" type="button">
+              <span class="smm-p-icon fb">FB</span>
+              <b>Facebook</b>
+            </button>
+            <button class="smm-platform-btn" data-smm-platform="TikTok" type="button">
+              <span class="smm-p-icon tiktok">TT</span>
+              <b>TikTok</b>
+            </button>
+            <button class="smm-platform-btn" data-smm-platform="Instagram" type="button">
+              <span class="smm-p-icon ig">IG</span>
+              <b>Instagram</b>
+            </button>
+            <button class="smm-platform-btn" data-smm-platform="YouTube" type="button">
+              <span class="smm-p-icon yt">YT</span>
+              <b>YouTube</b>
+            </button>
+            <button class="smm-platform-btn" data-smm-platform="Telegram" type="button">
+              <span class="smm-p-icon tg">TG</span>
+              <b>Telegram</b>
+            </button>
+            <button class="smm-platform-btn" data-smm-platform="Other" type="button">
+              <span class="smm-p-icon other"><i data-icon="users"></i></span>
+              <b>Khác</b>
+            </button>
+          </div>
+
+          <!-- Service Category Action Filter Chips -->
+          <div class="smm-action-chips" id="smmActionChips">
+            <button class="active" data-smm-action="all" type="button">Tất cả</button>
+            <button data-smm-action="like" type="button">❤️ Like / Tim</button>
+            <button data-smm-action="follow" type="button">👤 Follow / Sub</button>
+            <button data-smm-action="view" type="button">👁️ View / Xem</button>
+            <button data-smm-action="comment" type="button">💬 Bình luận</button>
+            <button data-smm-action="live" type="button">📡 Mắt Live / Share</button>
+          </div>
+
+          <!-- Search & Count Toolbar -->
+          <div class="search-box smm-search">
+            <i data-icon="search"></i>
+            <input id="smmSearchInput" type="search" placeholder="Tìm theo tên dịch vụ, server, ID..." autocomplete="off">
+            <button id="clearSmmSearch" aria-label="Xóa tìm kiếm">×</button>
+          </div>
+
+          <!-- Server / Service Selection Cards -->
+          <div class="smm-section-label">2. CHỌN MÁY CHỦ / GÓI DỊCH VỤ</div>
+          <div class="smm-server-list" id="smmServerList">
+            <!-- Rendered by JS -->
+          </div>
+
+          <div id="smmEmptyServices" class="empty-state" hidden>
+            <span><i data-icon="search"></i></span>
+            <h3>Chưa tìm thấy dịch vụ phù hợp</h3>
+            <p>Thử chọn nền tảng khác hoặc đổi từ khóa tìm kiếm.</p>
+            <button id="clearSmmFilters" type="button">Xem tất cả dịch vụ</button>
+          </div>
+
+          <!-- Order Configuration Form -->
+          <div class="smm-form-card" id="smmFormCard" hidden>
+            <div class="smm-form-header">
+              <span class="smm-active-service-badge" id="smmSelectedPlatform">FACEBOOK</span>
+              <h3 id="smmSelectedTitle">Tên dịch vụ</h3>
+              <p id="smmSelectedDesc">Mô tả chi tiết và lưu ý tốc độ máy chủ</p>
+            </div>
+
+            <!-- Target Link Input with Paste button -->
+            <div class="smm-input-group">
+              <label for="smmTargetInput">
+                <span>LINK HOẶC USERNAME CẦN BUFF <b class="req">*</b></span>
+                <button type="button" class="smm-paste-btn" id="smmPasteBtn"><i data-icon="copy"></i> Dán nhanh</button>
+              </label>
+              <div class="smm-input-wrapper">
+                <input id="smmTargetInput" type="text" placeholder="https://... hoặc @username" autocomplete="off">
+              </div>
+              <small class="smm-field-hint" id="smmTargetHint">Đảm bảo bài viết/trang ở chế độ CÔNG KHAI (Public)</small>
+            </div>
+
+            <!-- Quantity Input & Quick Quantity Pills -->
+            <div class="smm-input-group">
+              <label for="smmQtyInput">
+                <span>SỐ LƯỢNG TƯƠNG TÁC <b class="req">*</b></span>
+                <span class="smm-range-hint" id="smmRangeHint">Min: 50 · Max: 50,000</span>
+              </label>
+              <div class="smm-qty-picker">
+                <button type="button" class="smm-qty-btn" id="smmQtyDec">−</button>
+                <input id="smmQtyInput" type="number" inputmode="numeric" value="100" min="1" step="1">
+                <button type="button" class="smm-qty-btn" id="smmQtyInc">+</button>
+              </div>
+              <div class="smm-quick-pills">
+                <button type="button" data-add-qty="100">+100</button>
+                <button type="button" data-add-qty="500">+500</button>
+                <button type="button" data-add-qty="1000">+1.000</button>
+                <button type="button" data-add-qty="5000">+5.000</button>
+                <button type="button" id="smmSetMaxQty">Tối đa</button>
+              </div>
+            </div>
+
+            <!-- Comments Input (Conditional) -->
+            <div class="smm-input-group" id="smmCommentsGroup" hidden>
+              <label for="smmCommentsInput">
+                <span>DANH SÁCH BÌNH LUẬN <b class="req">*</b></span>
+                <span class="smm-comment-count" id="smmCommentCount">0 bình luận</span>
+              </label>
+              <textarea id="smmCommentsInput" rows="4" placeholder="Mỗi dòng là 1 nội dung bình luận..."></textarea>
+              <small class="smm-field-hint">Số lượng đơn hàng sẽ tự động bằng số dòng bình luận đã nhập.</small>
+            </div>
+
+            <!-- Order Quote Summary & Submit -->
+            <div class="smm-summary-box">
+              <div class="smm-summary-row">
+                <span>Đơn giá tương tác</span>
+                <strong id="smmSummaryUnitPrice">0 ₫ / lượt</strong>
+              </div>
+              <div class="smm-summary-row">
+                <span>Số lượng đặt</span>
+                <strong id="smmSummaryQty">0</strong>
+              </div>
+              <div class="smm-summary-row total">
+                <span>TỔNG THANH TOÁN</span>
+                <strong id="smmSummaryTotal">0 ₫</strong>
+              </div>
+              <div class="smm-balance-check" id="smmBalanceCheck">
+                <div class="smm-balance-indicator">
+                  <span id="smmBalanceNote">Số dư ví đủ để thanh toán</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Action buttons -->
+            <div class="smm-submit-actions">
+              <button type="button" class="primary-button smm-submit-btn" id="smmSubmitWalletBtn">
+                <i data-icon="zap"></i><span>Tạo tiến trình bằng Ví Bot</span>
+              </button>
+              <button type="button" class="smm-alt-btn" id="smmSubmitOtherBtn">
+                <span>Thanh toán qua QR Ngân Hàng / USDT</span>
+              </button>
+            </div>
+
+            <!-- Safety Callout -->
+            <div class="smm-safety-callout">
+              <i data-icon="shield"></i>
+              <div>
+                <b>Lưu ý quan trọng khi buff:</b>
+                <p>Không đổi ID, username hoặc link khi tiến trình đang chạy. Không tạo nhiều đơn cùng lúc cho 1 link. Mọi đơn bị hủy nguồn sẽ được tự động hoàn tiền về ví bot.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== SUB-TAB 2: TIẾN ĐỘ & ĐƠN BUFF ==================== -->
+        <div id="smmTrackingView" class="smm-subview" hidden>
+          <div class="smm-tracking-toolbar">
+            <div class="smm-tracking-filters" id="smmTrackingFilters">
+              <button class="active" data-track-status="all" type="button">Tất cả</button>
+              <button data-track-status="running" type="button">Đang chạy</button>
+              <button data-track-status="completed" type="button">Hoàn thành</button>
+              <button data-track-status="refunded" type="button">Đã hoàn</button>
+            </div>
+            <button type="button" class="smm-refresh-all-btn" id="smmRefreshAllBtn">
+              <i data-icon="refresh"></i> Làm mới
+            </button>
+          </div>
+
+          <div class="smm-order-list" id="smmOrderList">
+            <!-- Rendered by JS -->
+          </div>
+
+          <div id="smmEmptyOrders" class="empty-state" hidden>
+            <span><i data-icon="clock"></i></span>
+            <h3>Chưa có đơn buff nào</h3>
+            <p>Các đơn buff mạng xã hội của bạn sẽ xuất hiện và cập nhật tiến độ tự động tại đây.</p>
+            <button type="button" id="smmGoOrderBtn">Tạo đơn buff ngay</button>
+          </div>
+        </div>
+
+        <!-- ==================== SUB-TAB 3: BẢNG GIÁ & HƯỚNG DẪN ==================== -->
+        <div id="smmPricingView" class="smm-subview" hidden>
+          <div class="search-box smm-search">
+            <i data-icon="search"></i>
+            <input id="smmPricingSearchInput" type="search" placeholder="Tra cứu giá dịch vụ...">
+          </div>
+
+          <div class="smm-pricing-table-card">
+            <div class="smm-pricing-header">
+              <h3>Bảng Giá Dịch Vụ Mạng Xã Hội</h3>
+              <small>Cập nhật theo thời gian thực</small>
+            </div>
+            <div class="smm-pricing-scroll">
+              <table class="smm-table" id="smmPricingTable">
+                <thead>
+                  <tr>
+                    <th>Dịch vụ</th>
+                    <th>Nền tảng</th>
+                    <th>Giá / 1.000</th>
+                    <th>Min – Max</th>
+                    <th>Bảo hành</th>
+                  </tr>
+                </thead>
+                <tbody id="smmPricingBody">
+                  <!-- Rendered by JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="smm-guide-card">
+            <h3><i data-icon="tool"></i> Hướng Dẫn Lấy Link Chuẩn</h3>
+            <div class="smm-guide-item">
+              <b>🔵 Facebook:</b>
+              <p>• Bài viết: Nhấp vào thời gian đăng bài (vd: "15 phút trước", "Hôm qua") ➔ Sao chép liên kết.<br>• Trang/Profile: Sao chép link từ thanh địa chỉ trình duyệt hoặc nút "Chia sẻ trang" trên app.</p>
+            </div>
+            <div class="smm-guide-item">
+              <b>⚫ TikTok:</b>
+              <p>• Video: Bấm nút "Chia sẻ" (mũi tên hoặc dấu 3 chấm) ➔ Chọn "Sao chép liên kết".<br>• Kênh: Nhập dạng <code>https://www.tiktok.com/@username</code> hoặc <code>@username</code>.</p>
+            </div>
+            <div class="smm-guide-item">
+              <b>🟣 Instagram:</b>
+              <p>• Bài viết/Reels: Bấm icon Chia sẻ (hình máy bay giấy) ➔ Chọn "Sao chép liên kết".</p>
+            </div>
+            <div class="smm-guide-item">
+              <b>🔷 Telegram:</b>
+              <p>• Kênh/Nhóm: Link công khai dạng <code>https://t.me/tenkenh</code> hoặc <code>@tenkenh</code>.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="page" data-page="orders">
+        <div class="page-title"><div><p class="eyebrow">DINO VAULT</p><h1>Đơn hàng & bảo hành</h1></div><button class="icon-button light" id="refreshButton" aria-label="Làm mới"><i data-icon="refresh"></i></button></div>
+        <div class="order-stats">
+          <div class="order-stat-card">
+            <span class="stat-icon green"><i data-icon="check"></i></span>
+            <div class="stat-text"><small>ĐÃ MUA</small><b id="orderCount">0 đơn</b></div>
+          </div>
+          <div class="order-stat-card">
+            <span class="stat-icon gold"><i data-icon="shield"></i></span>
+            <div class="stat-text"><small>CÒN BẢO HÀNH</small><b id="warrantyCount">0 đơn</b></div>
+          </div>
+        </div>
+        <div class="segmented">
+          <button class="active" data-order-tab="orders"><span>Đơn hàng</span></button>
+          <button data-order-tab="claims"><span>Yêu cầu BH</span> <span id="claimCount" class="tab-badge">0</span></button>
+        </div>
+        <div id="orderList" class="order-list"></div><div id="claimList" class="order-list" hidden></div>
+        <div id="emptyOrders" class="empty-state" hidden><span><i data-icon="package"></i></span><h3>Chưa có đơn hàng</h3><p>Sản phẩm bạn mua sẽ xuất hiện tại đây.</p><button data-go="shop">Khám phá cửa hàng</button></div>
+      </section>
+
+      <section class="page" data-page="tools">
+        <div class="page-title"><div><p class="eyebrow">DINO TOOLBOX</p><h1>Tiện ích nhanh</h1></div><span class="count-pill">LOCAL ONLY</span></div>
+        <div class="privacy-note"><i data-icon="lock"></i><p><b>Riêng tư tuyệt đối</b><span>Secret 2FA, email và mật khẩu chỉ xử lý trên thiết bị, không gửi về server.</span></p></div>
+
+        <div class="tool-tabs">
+          <button class="active" data-tool="totp"><span class="tool-tab-icon green"><i data-icon="key"></i></span><b>Mã 2FA</b></button>
+          <button data-tool="alias"><span class="tool-tab-icon blue"><i data-icon="mail"></i></span><b>Mail Alias</b></button>
+          <button data-tool="password"><span class="tool-tab-icon violet"><i data-icon="shield"></i></span><b>Mật khẩu</b></button>
+          <button data-tool="uuid"><span class="tool-tab-icon gold"><i data-icon="hash"></i></span><b>UUID</b></button>
+        </div>
+
+        <section class="tool-panel active" data-tool-panel="totp">
+          <div class="tool-heading"><span class="menu-icon green"><i data-icon="key"></i></span><div><h2>Tạo mã 2FA</h2><p>Hỗ trợ secret Base32 tiêu chuẩn Google Authenticator.</p></div></div>
+          <label class="utility-field"><span>SECRET KEY</span><div><input id="totpSecret" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="JBSWY3DPEHPK3PXP"><button data-paste="totpSecret"><i data-icon="clipboard"></i></button></div></label>
+          <div class="totp-result"><div class="totp-ring" id="totpRing"><span id="totpCountdown">30</span></div><div><small>MÃ XÁC THỰC</small><strong id="totpCode">—— ——</strong></div><button id="copyTotp" aria-label="Sao chép mã"><i data-icon="copy"></i></button></div>
+          <p class="tool-hint">Mã tự động đổi sau mỗi 30 giây. Secret không bao giờ rời khỏi trình duyệt.</p>
+        </section>
+
+        <section class="tool-panel" data-tool-panel="alias">
+          <div class="tool-heading"><span class="menu-icon blue"><i data-icon="mail"></i></span><div><h2>Tạo Email Alias</h2><p>Tạo biến thể Gmail bằng dấu chấm hoặc dấu cộng.</p></div></div>
+          <label class="utility-field"><span>EMAIL GỐC</span><div><input id="aliasEmail" type="email" autocomplete="off" placeholder="username@gmail.com"><button data-paste="aliasEmail"><i data-icon="clipboard"></i></button></div></label>
+          <div class="alias-options"><button class="active" data-alias-mode="plus">Dấu +</button><button data-alias-mode="dots">Dấu chấm</button><select id="aliasCount"><option value="5">5 alias</option><option value="10" selected>10 alias</option><option value="20">20 alias</option></select></div>
+          <button id="generateAlias" class="primary-button"><span>Tạo danh sách alias</span><i data-icon="zap"></i></button>
+          <div id="aliasResults" class="utility-results"></div>
+        </section>
+
+        <section class="tool-panel" data-tool-panel="password">
+          <div class="tool-heading"><span class="menu-icon violet"><i data-icon="shield"></i></span><div><h2>Mật khẩu mạnh</h2><p>Tạo bằng bộ sinh số ngẫu nhiên an toàn của thiết bị.</p></div></div>
+          <div class="password-output"><code id="passwordOutput">Nhấn tạo để bắt đầu</code><button id="copyPassword"><i data-icon="copy"></i></button></div>
+          <label class="range-label"><span>Độ dài <b id="passwordLengthLabel">20</b></span><input id="passwordLength" type="range" min="12" max="64" value="20"></label>
+          <div class="password-options"><label><input id="passwordUpper" type="checkbox" checked><span>ABC</span></label><label><input id="passwordNumber" type="checkbox" checked><span>123</span></label><label><input id="passwordSymbol" type="checkbox" checked><span>!@#</span></label></div>
+          <button id="generatePassword" class="primary-button"><span>Tạo mật khẩu mới</span><i data-icon="refresh"></i></button>
+        </section>
+
+        <section class="tool-panel" data-tool-panel="uuid">
+          <div class="tool-heading"><span class="menu-icon gold"><i data-icon="hash"></i></span><div><h2>UUID Generator</h2><p>Tạo UUID v4 chuẩn, phù hợp mã tham chiếu và API.</p></div></div>
+          <div id="uuidResults" class="utility-results"></div>
+          <button id="generateUuid" class="primary-button"><span>Tạo 5 UUID mới</span><i data-icon="refresh"></i></button>
+        </section>
+      </section>
+
+      <section class="page nf-hub-page" data-page="netflix" id="netflixPage">
+        <!-- Hero Header -->
+        <div class="nf-header-wrap">
+          <div class="nf-banner-img-wrap" style="margin-bottom:14px;border-radius:14px;overflow:hidden;box-shadow:0 8px 24px rgba(229,9,20,0.25);border:1px solid rgba(229,9,20,0.3);">
+            <img src="./miniapp/assets/netflix_banner.jpg" alt="Netflix Hub Banner" loading="lazy" decoding="async" style="width:100%;height:auto;display:block;border-radius:14px;">
+          </div>
+          <div class="nf-brand-pill">
+            <span class="nf-n-logo">N</span>
+            <span class="nf-badge-text">TV ACCESS · CINEMA HUB</span>
+          </div>
+          <h1 class="nf-main-heading">Netflix TV & Login</h1>
+          <p class="nf-sub-heading">Liên kết Netflix với TV bằng mã kích hoạt, không cần tải cookie hoặc mở login URL.</p>
+        </div>
+
+        <div id="netflixDisabledBanner" class="admin-security nf-disabled-notice" hidden>
+          <i data-icon="lock"></i>
+          <p><b>Dịch vụ tạm ngưng:</b> Tính năng Netflix đang được quản trị viên tạm tắt để bảo trì hệ thống.</p>
+        </div>
+
+        <!-- VIP Membership Overview Card -->
+        <article class="nf-vip-status-card">
+          <div class="nf-card-ambient"></div>
+          <div class="nf-status-top">
+            <div class="nf-live-indicator">
+              <span class="nf-pulse-dot"></span>
+              <span id="netflixLiveStockCount">Kho: Sẵn sàng</span>
+            </div>
+            <span id="netflixPlanBadge" class="nf-tag-pill">CHƯA KÍCH HOẠT</span>
+          </div>
+          <div class="nf-user-plan-title" id="netflixPlanTitle">Chưa có gói VIP</div>
+          <div class="nf-meta-grid">
+            <div class="nf-meta-cell">
+              <small>HẠN DÙNG CÒN LẠI</small>
+              <strong id="netflixDaysLeft">0 ngày</strong>
+            </div>
+            <div class="nf-meta-cell">
+              <small>LƯỢT DÙNG HÔM NAY</small>
+              <strong id="netflixUsageToday">0 / 0</strong>
+            </div>
+            <div class="nf-meta-cell">
+              <small>QUYỀN LỢI GHÉP TV</small>
+              <strong id="netflixTvPerm">Chưa hỗ trợ</strong>
+            </div>
+          </div>
+        </article>
+
+        <!-- Netflix Hub Action Container (TV + Links) -->
+        <div id="netflixActionsPanel" class="nf-actions-container">
+          <!-- SECTION 1: SMART TV LOGIN (Image 3 layout) -->
+          <div class="nf-feature-box">
+            <!-- Frosted Glass Lock Overlay for Non-VIP or Non-Pro -->
+            <div class="nf-lock-overlay" id="netflixTvLockOverlay" hidden>
+              <div class="lock-icon-circle">📺</div>
+              <div class="lock-title">Ghép Nối TV Dành Cho Gói Pro</div>
+              <div class="lock-desc">Kích hoạt Gói VIP Pro để liên kết trực tiếp mã 8 ký tự với ứng dụng Netflix trên Smart TV.</div>
+              <button class="btn-unlock-vip" type="button" onclick="document.getElementById('netflixPricingBlock')?.scrollIntoView({behavior:'smooth'})">
+                <span>👑 Mua Gói Pro TV (30.000đ)</span>
+              </button>
+            </div>
+
+            <div class="nf-feature-badge"><span class="nf-green-dot"></span> HỆ THỐNG TỰ ĐỘNG</div>
+            <h2 class="nf-box-title">Nhập mã hiển thị trên TV</h2>
+            <p class="nf-box-desc">Mã gồm 8 ký tự. Không chia sẻ mã với người khác trong lúc xử lý.</p>
+
+            <div class="nf-tv-layout">
+              <div class="nf-tv-form-side">
+                <label class="nf-input-label">MÃ KÍCH HOẠT (8 KÝ TỰ)</label>
+                <div class="nf-tv-code-wrapper">
+                  <input id="netflixTvCodeInput" maxlength="8" placeholder="••••••••" autocomplete="off" autocapitalize="characters" spellcheck="false">
+                </div>
+                <button id="netflixTvPairBtn" class="primary-button nf-btn-submit-tv" type="button">
+                  <span class="btn-icon">📺</span>
+                  <span>Liên kết TV</span>
+                </button>
+                <div id="netflixTvResult" class="nf-result-toast" hidden></div>
+
+                <div class="nf-security-footnotes">
+                  <div class="nf-footnote-row"><i data-icon="shield"></i> Mã được xử lý qua kết nối server bảo mật. Web không nhận cookie tài khoản.</div>
+                  <div class="nf-footnote-row"><i data-icon="clock"></i> Reset lượt dùng mỗi ngày lúc 00:00 theo múi giờ hệ thống.</div>
+                </div>
+              </div>
+
+              <!-- Quick Guide Column (01 -> 04) -->
+              <div class="nf-guide-card">
+                <div class="nf-guide-header"><span class="guide-icon">📖</span> <b>Hướng dẫn nhanh</b></div>
+                <div class="nf-step-row">
+                  <span class="step-num">01</span>
+                  <div class="step-text">Mở ứng dụng Netflix trên TV và chọn <b>Đăng nhập</b>.</div>
+                </div>
+                <div class="nf-step-row">
+                  <span class="step-num">02</span>
+                  <div class="step-text">Chọn đăng nhập bằng trình duyệt hoặc <b>mã kích hoạt</b>.</div>
+                </div>
+                <div class="nf-step-row">
+                  <span class="step-num">03</span>
+                  <div class="step-text">Nhập mã 8 ký tự đang hiển thị trên TV vào ô bên cạnh.</div>
+                </div>
+                <div class="nf-step-row">
+                  <span class="step-num">04</span>
+                  <div class="step-text">Chờ thông báo thành công rồi quay lại màn hình TV.</div>
+                </div>
+                <div class="nf-guide-tip">Giữ nguyên màn hình mã trên TV cho tới khi web báo liên kết thành công.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SECTION 2: 1-CLICK LOGIN LINK & POOL CARDS (Image 2 layout) -->
+          <div class="nf-feature-box" id="netflixLinkFeatureBox" style="margin-top:20px;">
+            <!-- Frosted Glass Lock Overlay for Non-VIP -->
+            <div class="nf-lock-overlay" id="netflixLinkLockOverlay" hidden>
+              <div class="lock-icon-circle">🔒</div>
+              <div class="lock-title">Tính năng dành cho VIP</div>
+              <div class="lock-desc">Kích hoạt gói thành viên để lấy token 1-click vào thẳng Netflix không cần mật khẩu.</div>
+              <button class="btn-unlock-vip" type="button" onclick="document.getElementById('netflixPricingBlock')?.scrollIntoView({behavior:'smooth'})">
+                <span>⚡ Mở Khóa Gói VIP (Từ 15K)</span>
+              </button>
+            </div>
+            <!-- Blocking Loading Overlay While Creating Link / Exporting Cookie -->
+            <div class="nf-busy-overlay" id="netflixLinkBusyOverlay" hidden aria-live="polite">
+              <div class="nf-spinner" aria-hidden="true"></div>
+              <div class="nf-busy-title" id="netflixLinkBusyTitle">Đang tạo link đăng nhập...</div>
+              <div class="nf-busy-desc" id="netflixLinkBusyDesc">Đang kiểm tra tài khoản &amp; khởi tạo token bảo mật. Vui lòng không chạm lại cho đến khi hoàn thành.</div>
+            </div>
+
+            <div class="nf-feature-badge"><span class="nf-green-dot"></span> DIRECT ACCESS</div>
+            <div class="nf-box-header-flex">
+              <div>
+                <h2 class="nf-box-title">Đăng nhập Trực Tiếp 1-Click</h2>
+                <p class="nf-box-desc">Chọn loại liên kết tương ứng thiết bị đang dùng để tạo token đăng nhập ngay lập tức.</p>
+              </div>
+              <button class="nf-btn-refresh-pill" id="netflixRefresh" type="button" aria-label="Làm mới">
+                <i data-icon="refresh"></i> <span>Đổi Acc Khác</span>
+              </button>
+            </div>
+
+            <!-- Account Card Sample Preview (Image 2 style) -->
+            <article class="nf-account-card">
+              <div class="nf-acc-header">
+                <div class="nf-acc-tags">
+                  <span class="nf-acc-id" id="netflixAccIdLabel">Live #Account</span>
+                  <span class="nf-tag-mini red">Premium</span>
+                  <span class="nf-tag-mini blue">UHD</span>
+                  <span class="nf-tag-mini country" id="netflixAccCountryBadge">🇺🇸 US</span>
+                  <span class="nf-tag-mini gray">All devices</span>
+                </div>
+                <div class="nf-status-tag-green">● Sẵn sàng</div>
+              </div>
+
+              <div class="nf-acc-grid">
+                <div class="nf-acc-item">
+                  <span class="acc-lbl">GÓI XEM</span>
+                  <span class="acc-val" id="netflixAccPlanVal">Premium (4K HDR)</span>
+                </div>
+                <div class="nf-acc-item">
+                  <span class="acc-lbl">QUỐC GIA ACC</span>
+                  <span class="acc-val" id="netflixAccCountryVal">🇺🇸 Hoa Kỳ (US)</span>
+                </div>
+                <div class="nf-acc-item">
+                  <span class="acc-lbl">CHẤT LƯỢNG</span>
+                  <span class="acc-val">UHD · 4 Thiết bị</span>
+                </div>
+                <div class="nf-acc-item">
+                  <span class="acc-lbl">TÌNH TRẠNG</span>
+                  <span class="acc-val text-green">Ổn định 100%</span>
+                </div>
+                <div class="nf-acc-item">
+                  <span class="acc-lbl">GIA HẠN</span>
+                  <span class="acc-val">Tự động (Active)</span>
+                </div>
+                <div class="nf-acc-item">
+                  <span class="acc-lbl">IP / VÙNG</span>
+                  <span class="acc-val text-green" id="netflixAccRegionVal">Xem trực tiếp (No VPN)</span>
+                </div>
+              </div>
+
+              <div class="nf-acc-subtext">
+                <i data-icon="check"></i> Đã lọc E114, E120 và kiểm tra membership còn hạn
+              </div>
+
+              <div class="nf-acc-actions">
+                <button id="netflixGetLinkPcBtn" class="nf-btn-create-link" type="button">
+                  <span>Tạo link PC / Laptop</span>
+                </button>
+                <button id="netflixGetLinkMobileBtn" class="nf-btn-create-link secondary" type="button">
+                  <span>📱 Link Mobile App</span>
+                </button>
+                <button id="netflixGetCookieBtn" class="nf-btn-create-link outline" type="button">
+                  <i data-icon="copy"></i> <span>Copy Cookie</span>
+                </button>
+              </div>
+            </article>
+
+            <!-- Result Box -->
+            <div id="netflixLinkResult" class="nf-result-toast" hidden></div>
+          </div>
+        </div>
+
+        <!-- SECTION 3: SUBSCRIPTION & UPGRADE -->
+        <div class="section-block" id="netflixPricingBlock" style="margin-top:24px;">
+          <div class="section-heading">
+            <div>
+              <span class="live-badge" style="color:#ff3b4e;"><i style="background:#ff3b4e;"></i>BẢNG GIÁ VIP</span>
+              <h2 style="color:#fff;">Nâng Cấp Gói VIP</h2>
+            </div>
+          </div>
+
+          <div class="nf-pricing-grid">
+            <!-- Basic Plan -->
+            <article class="nf-price-card">
+              <div>
+                <div class="nf-plan-name" style="color:#ff8595;">Gói Basic</div>
+                <div class="nf-plan-price" id="netflixBasicPrice">15.000 ₫</div>
+                <ul class="nf-plan-perks">
+                  <li><i>✓</i> <b>30 ngày</b> sử dụng</li>
+                  <li><i>✓</i> Lấy link Mobile & PC</li>
+                  <li><i>✓</i> Cấp mới mỗi ngày</li>
+                  <li style="color:#666;"><i>✗</i> Không hỗ trợ ghép TV</li>
+                </ul>
+              </div>
+              <button class="primary-button nf-btn-buy" id="buyNetflixBasicBtn" style="background:#261216;border:1px solid rgba(229,9,20,0.4);color:#ff8595;">
+                <span>Mua Basic</span>
+              </button>
+            </article>
+
+            <!-- Pro Plan (Featured) -->
+            <article class="nf-price-card featured">
+              <span class="nf-popular-badge">KHUYÊN DÙNG ⭐</span>
+              <div>
+                <div class="nf-plan-name" style="color:#ff3b4e;">Gói Pro (TV + 4K)</div>
+                <div class="nf-plan-price" id="netflixProPrice">30.000 ₫</div>
+                <ul class="nf-plan-perks">
+                  <li><i>✓</i> <b>30 ngày</b> sử dụng</li>
+                  <li><i>✓</i> <b>Ghép mã TV 8 số tức thì</b></li>
+                  <li><i>✓</i> Link Mobile & PC 4K</li>
+                  <li><i>✓</i> Hạn mức cao nhất</li>
+                </ul>
+              </div>
+              <button class="primary-button nf-btn-buy primary-red" id="buyNetflixProBtn">
+                <span>Mua Pro TV</span>
+              </button>
+            </article>
+          </div>
+          <p class="safe-note" style="margin-top:12px;color:#8ca097;"><i data-icon="wallet"></i>Thanh toán tự động trừ thẳng vào số dư Ví Dino</p>
+        </div>
+
+        <!-- Recent Usage History -->
+        <div class="section-block" style="margin-top:22px;">
+          <div class="section-heading">
+            <div>
+              <span class="live-badge" style="color:#ff3b4e;"><i style="background:#ff3b4e;"></i>LỊCH SỬ</span>
+              <h2 style="color:#fff;">Lịch Sử Đã Nhận</h2>
+            </div>
+          </div>
+          <div id="netflixHistoryList" class="order-list"></div>
+        </div>
+
+        <div style="margin-top:24px;margin-bottom:40px;">
+          <button class="admin-advanced admin-store-return" data-go="home" style="background:#13080b;border:1px solid rgba(229,9,20,0.25);color:#ff8595;">
+            <span>Trở về cửa hàng</span><i data-icon="home"></i>
+          </button>
+        </div>
+      </section>
+
+      <section class="page" data-page="admin" id="miniAdminPage" data-admin-only hidden>
+        <div class="page-title"><div><p class="eyebrow">DINO CONTROL CENTER</p><h1>Quản trị Mini App</h1></div><button class="icon-button light" id="adminRefresh" aria-label="Làm mới quản trị"><i data-icon="refresh"></i></button></div>
+        <div class="admin-hero"><p class="eyebrow">PHIÊN QUẢN TRỊ BẢO MẬT · <span id="adminRole">OWNER</span></p><h2>Xin chào, <span id="adminName">Admin</span></h2><p>Quyền được xác minh lại bằng Telegram ở mọi request. Không sử dụng role phía trình duyệt để cấp quyền.</p></div>
+        <div class="admin-security"><i data-icon="lock"></i><p><b>Xác nhận hai bước cho thao tác ghi</b>Bật/tắt, thay đổi số dư hoặc xóa pending đều cần xác nhận một lần nữa và token chỉ dùng được một lần trong 120 giây.</p></div>
+        <div class="admin-kpis" id="adminKpis"><div class="admin-loading">Đang tải chỉ số...</div></div>
+        <div class="admin-financial-summary" id="adminFinancialSummary" data-admin-capability="finance.read" hidden></div>
+        <div class="admin-integrity" id="adminIntegrity" data-admin-capability="finance.read" hidden>Đang đối soát sổ cái ví...</div>
+        <div class="admin-filters" data-admin-capability="orders.read" hidden><input id="adminSearch" type="search" placeholder="Mã đơn, sản phẩm, user..." aria-label="Tìm dữ liệu quản trị"><select id="adminStatus" aria-label="Lọc trạng thái"><option value="all">Mọi trạng thái</option><option value="completed">Hoàn thành</option><option value="pending">Pending</option><option value="refunded">Hoàn tiền</option></select><div class="admin-filter-actions"><input id="adminDay" type="date" aria-label="Lọc theo ngày"><button id="adminClearFilters">Xóa lọc</button><button id="adminExport" data-admin-capability="finance.report" hidden>Xuất CSV</button></div></div>
+        <div class="admin-tabs" id="adminTabs">
+          <button class="active" data-admin-tab="orders" data-admin-capability="orders.read" hidden>Đơn hàng</button>
+          <button data-admin-tab="products" data-admin-capability="catalog.read" hidden>Sản phẩm</button>
+          <button data-admin-tab="users" data-admin-capability="finance.read" hidden>Users</button>
+          <button data-admin-tab="support" data-admin-capability="support.read" hidden>Hỗ trợ</button>
+          <button data-admin-tab="api" data-admin-capability="api.read" hidden>API partner</button>
+          <button data-admin-tab="audit" data-admin-capability="finance.read" hidden>Sổ cái</button>
+        </div>
+        <section class="admin-panel active" data-admin-panel="orders" data-admin-capability="orders.read" hidden><div class="admin-list" id="adminOrders"><div class="admin-loading">Đang tải đơn hàng...</div></div></section>
+        <section class="admin-panel" data-admin-panel="products" data-admin-capability="catalog.read" hidden>
+        <div id="adminSurfsharkBox" class="admin-surfshark-card" hidden></div>
+        <div class="admin-list" id="adminProducts"></div>
+      </section>
+        <section class="admin-panel" data-admin-panel="users" data-admin-capability="finance.read" hidden><div class="admin-list" id="adminUsers"></div></section>
+        <section class="admin-panel" data-admin-panel="support" data-admin-capability="support.read" hidden><button id="openTicketInbox" class="primary-button" type="button">💬 Mở hộp thư chat riêng</button><div class="admin-list" id="adminSupport"></div></section>
+        <section class="admin-panel" data-admin-panel="api" data-admin-capability="api.read" hidden><div class="admin-list" id="adminApi"></div></section>
+        <section class="admin-panel" data-admin-panel="audit" data-admin-capability="finance.read" hidden><div class="admin-list" id="adminAudit"></div></section>
+        <div class="admin-footer-actions"><button class="admin-advanced admin-store-return" data-go="home"><span>Trở về cửa hàng</span><i data-icon="home"></i></button><button class="admin-advanced" id="openAdvancedAdmin" data-admin-capability="admin.web.open" hidden><span>Mở Admin Web nâng cao</span><i data-icon="arrow"></i></button></div>
+      </section>
+
+      <section class="page" data-page="profile">
+        <div class="profile-hero">
+          <div class="profile-avatar"><span id="profileInitial">D</span><i data-icon="check"></i></div>
+          <h1 id="profileName">Dino Member</h1>
+          <p id="profileUsername">Thành viên Dino Store</p>
+          <div class="rank-card-luxury" id="profileRoleCard">
+            <span class="rank-crown-icon"><i data-icon="crown"></i></span>
+            <b id="profileRole">HẠNG DIAMOND</b>
+            <span class="role-label" id="profileRank" style="display:none"></span>
+          </div>
+        </div>
+
+        <!-- VIP Balance & Loyalty Card -->
+        <section class="profile-vip-card">
+          <div class="vip-head">
+            <div>
+              <span class="vip-label">SỐ DƯ KHẢ DỤNG</span>
+              <div class="vip-balance" id="profileBalance">0 ₫</div>
+            </div>
+            <button id="topupProfile" class="vip-topup-btn" type="button"><i data-icon="plus"></i> Nạp tiền</button>
+          </div>
+          <div class="vip-loyalty-strip">
+            <div class="vip-loyalty-text">
+              <div>
+                <b id="rankDetailName">HẠNG THÀNH VIÊN</b>
+                <small id="rankDetailNote">Mua sắm để mở khóa quyền lợi tiếp theo.</small>
+              </div>
+              <span class="vip-spent-badge" id="rankDetailSpent">0 ₫</span>
+            </div>
+            <div class="vip-progress-track">
+              <span class="vip-progress-fill" id="rankProgressBar"></span>
+            </div>
+          </div>
+        </section>
+
+        <section class="profile-card">
+          <div class="profile-card-title"><h2>Cài đặt & Tài khoản</h2><span>An toàn & bảo mật</span></div>
+          <button data-go="admin" data-admin-only hidden><span class="menu-icon green"><i data-icon="shield"></i></span><span><b>Trung tâm quản trị</b><small>Mở dashboard dành riêng cho Admin</small></span><i data-icon="chevron"></i></button>
+          <button data-go="orders"><span class="menu-icon violet"><i data-icon="package"></i></span><span><b>Lịch sử đơn hàng</b><small>Tra cứu sản phẩm đã mua</small></span><i data-icon="chevron"></i></button>
+          <button id="openProfileReport" type="button" data-action="report" onclick="if(window.openWarranty)window.openWarranty()"><span class="menu-icon flame"><i data-icon="shield"></i></span><span><b>Báo lỗi / Bảo hành</b><small>Gửi yêu cầu hỗ trợ đơn hàng</small></span><i data-icon="chevron"></i></button>
+          <button id="soundToggle" type="button" aria-pressed="true"><span class="menu-icon gold"><i data-icon="volume"></i></span><span><b>Âm báo giao dịch</b><small>Phát tiếng ting khi thanh toán hoặc nạp tiền thành công</small></span><span class="switch active" id="soundSwitch"><i></i></span></button>
+          <button data-action="support"><span class="menu-icon blue"><i data-icon="message"></i></span><span><b>Hỗ trợ trực tiếp</b><small>Phản hồi trong 5–15 phút</small></span><i data-icon="chevron"></i></button>
+        </section>
+
+        <section class="profile-card">
+          <div class="profile-card-title"><h2>Giới thiệu bạn bè</h2><span id="referralInvited" class="count-pill">0 người</span></div>
+          <button id="copyReferral" class="referral-copy"><span class="menu-icon gold"><i data-icon="users"></i></span><span><b id="referralCommission">0 ₫ hoa hồng</b><small>Sao chép liên kết giới thiệu</small></span><i data-icon="copy"></i></button>
+          <button id="renewalToggle" type="button" aria-pressed="false"><span class="menu-icon green"><i data-icon="clock"></i></span><span><b>Nhắc mua lại/gia hạn</b><small>Nhận nhắc nhở cho sản phẩm sắp hết hạn</small></span><span class="switch" id="renewalSwitch"><i></i></span></button>
+        </section>
+
+        <section id="policyCard" class="profile-card policy-card-click" role="button" tabindex="0" aria-controls="policySheet">
+          <div class="profile-card-title"><h2>Chính sách & cam kết</h2><span>Ấn để xem chi tiết</span></div>
+          <div class="promise"><i data-icon="shield"></i><p><b>Bảo hành minh bạch</b><span>Mọi sản phẩm đều hiển thị rõ thời hạn và trạng thái bảo hành.</span></p></div>
+          <div class="promise"><i data-icon="zap"></i><p><b>Giao hàng siêu tốc</b><span>Sản phẩm có sẵn được giao tự động ngay khi hệ thống nhận thanh toán.</span></p></div>
+          <div class="promise"><i data-icon="lock"></i><p><b>Chỉ xử lý sau khi xác nhận tiền</b><span>MB Bank và USDT được tự động xác nhận khi chuyển đúng mạng, đúng số tiền và đúng địa chỉ/ID.</span></p></div>
+        </section>
+
+        <p class="version">DINO STORE MINI APP · CYBER LUXURY EDITION</p>
+      </section>
+    </div>
+
+    <nav class="bottom-nav" id="bottomNav" style="grid-template-columns:repeat(5,1fr)" hidden>
+      <button class="active" data-go="home"><i data-icon="home"></i><span>Trang chủ</span></button>
+      <button data-go="shop"><i data-icon="bag"></i><span>Cửa hàng</span></button>
+      <button data-go="orders"><span class="order-dot" id="orderDot"></span><i data-icon="receipt"></i><span>Đơn hàng</span></button>
+      <button data-go="tools"><i data-icon="grid"></i><span>Tiện ích</span></button>
+      <button class="admin-nav-button" data-go="admin" data-admin-only hidden><i data-icon="shield"></i><span>Quản trị</span></button>
+      <button data-go="profile"><i data-icon="user"></i><span>Tài khoản</span></button>
+    </nav>
+  </main>
+
+  <div id="sheetBackdrop" class="sheet-backdrop"></div>
+  <section id="productSheet" class="bottom-sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <div class="sheet-handle"></div><button class="sheet-close" data-close-sheet aria-label="Đóng">×</button>
+    <div id="sheetProductIcon" class="sheet-product-icon"></div><div class="sheet-category" id="sheetCategory"></div><h2 id="sheetTitle"></h2><p id="sheetDescription"></p>
+    <div class="detail-pills"><span><i data-icon="clock"></i><b id="sheetDuration"></b></span><span><i data-icon="shield"></i><b id="sheetWarranty"></b></span><span><i data-icon="package"></i><b id="sheetStock"></b></span></div>
+    <div id="checkoutInputs" class="checkout-inputs" hidden><label id="checkoutEmailWrap" hidden><span>EMAIL NHẬN DỊCH VỤ</span><input id="checkoutEmail" type="email" autocomplete="email" placeholder="email@example.com"></label><label id="checkoutTargetWrap" hidden><span>LINK / USERNAME CẦN CHẠY</span><input id="checkoutTarget" autocomplete="off" placeholder="https://... hoặc @username"></label><label id="checkoutCommentsWrap" hidden><span>NỘI DUNG / GHI CHÚ</span><textarea id="checkoutComments" rows="3" placeholder="Mỗi dòng một nội dung nếu dịch vụ yêu cầu"></textarea></label></div>
+    <label class="field-label">Mã giảm giá (nếu có)<input id="couponCode" class="sheet-input" autocomplete="off" maxlength="40" placeholder="Nhập coupon"><small id="couponHint"></small></label>
+    <div class="sheet-buy-row"><div><small>TỔNG THANH TOÁN</small><strong id="sheetPrice"></strong></div><div class="qty-control"><button id="qtyMinus">−</button><input id="qtyValue" type="number" inputmode="numeric" min="1" step="1" value="1" aria-label="Số lượng"><button id="qtyPlus">+</button></div></div>
+    <div class="sheet-secondary-actions"><button id="favoriteProduct"><i data-icon="heart"></i><span>Yêu thích</span></button><button id="addCart"><i data-icon="cart"></i><span>Thêm vào giỏ</span></button><button id="shareProductLink" type="button"><i data-icon="copy"></i><span>Copy link</span></button></div>
+    <button id="buyButton" class="primary-button"><span>Mua ngay</span><i data-icon="arrow"></i></button><p class="safe-note"><i data-icon="lock"></i>Thanh toán an toàn qua ví, QR ngân hàng hoặc USDT</p>
+  </section>
+
+  <section id="warrantySheet" class="bottom-sheet compact report-sheet" role="dialog" aria-modal="true" aria-labelledby="warrantyTitle">
+    <div class="sheet-handle"></div><button class="sheet-close" data-close-sheet aria-label="Đóng">×</button><span class="warranty-big-icon"><i data-icon="shield"></i></span><div class="sheet-category">TRUNG TÂM BÁO LỖI & BẢO HÀNH</div><h2 id="warrantyTitle">Báo lỗi đơn hàng</h2><p id="warrantySubTitle">Đơn <b id="warrantyOrderCode"></b></p>
+    <label class="field-label" id="warrantyOrderSelectLabel">Chọn mã đơn hàng cần báo lỗi<select id="warrantyOrderSelect" class="sheet-input report-select"><option value="">-- Đang tải đơn hàng... --</option></select></label>
+    <div class="report-picker" id="reportPicker">
+      <div class="report-search-wrap"><input id="reportOrderSearch" class="report-search" type="search" autocomplete="off" placeholder="Tìm mã đơn, tên sản phẩm..."></div>
+      <div id="reportOrderList" class="report-order-list" role="listbox" aria-label="Danh sách đơn hàng có thể báo lỗi"></div>
+    </div>
+    <div id="warrantyOrderPreview" class="warranty-order-preview" hidden></div>
+    <div class="field-label" style="margin-top:10px">Loại sự cố gặp phải</div>
+    <div class="report-reasons" id="reportReasons">
+      <button type="button" class="reason-chip active" data-reason="Sai mật khẩu / không đăng nhập được">Sai pass / lỗi login</button>
+      <button type="button" class="reason-chip" data-reason="Chưa nhận được link kích hoạt">Chưa nhận link</button>
+      <button type="button" class="reason-chip" data-reason="Bị mất gói / tài khoản bị hạ cấp">Bị mất gói / hạ cấp</button>
+      <button type="button" class="reason-chip" data-reason="Lỗi khác">Lỗi khác</button>
+    </div>
+    <label class="field-label">Mô tả chi tiết tình trạng lỗi<textarea id="warrantyDescription" rows="4" maxlength="1500" placeholder="Ví dụ: Tài khoản báo sai mật khẩu từ sáng nay..."></textarea><small><span id="charCount">0</span>/1500 ký tự</small></label>
+    <div class="field-label" style="margin-top:10px">Ảnh chụp màn hình lỗi (bắt buộc)</div>
+    <div class="photo-upload-box">
+      <button type="button" id="warrantyUploadBtn" class="upload-photo-btn">
+        <i data-icon="camera"></i>
+        <span>Chọn ảnh từ máy</span>
+      </button>
+      <input type="file" id="warrantyFileInput" accept="image/*" style="display:none">
+      <span class="upload-or">hoặc</span>
+      <input id="warrantyPhotoUrl" class="sheet-input photo-url-input" type="url" placeholder="Dán link ảnh screenshot">
+    </div>
+    <div id="warrantyPhotoPreview" class="warranty-photo-preview" hidden>
+      <img id="warrantyPhotoThumb" src="" alt="Screenshot">
+      <div class="photo-meta">
+        <b id="warrantyPhotoName">screenshot.jpg</b>
+        <small id="warrantyPhotoStatus">Đã chọn ảnh</small>
+      </div>
+      <button type="button" id="warrantyRemovePhoto" class="remove-photo-btn" aria-label="Xóa ảnh">×</button>
+    </div>
+    <button id="submitWarranty" class="primary-button"><span>Gửi báo lỗi cho Admin</span><i data-icon="send"></i></button>
+    <p class="safe-note"><i data-icon="shield"></i>Admin sẽ đối soát và phản hồi trong 5–15 phút.</p>
+  </section>
+
+  <section id="deliverySheet" class="bottom-sheet delivery-sheet" role="dialog" aria-modal="true" aria-labelledby="deliveryTitle">
+    <div class="sheet-handle"></div><button class="sheet-close" data-close-sheet aria-label="Đóng">×</button>
+    <div class="sheet-category">KHO HÀNG CỦA BẠN</div><h2 id="deliveryTitle">Thông tin sản phẩm</h2><p id="deliverySummary">Chỉ bạn mới xem được nội dung của đơn hàng này.</p>
+    <div class="delivery-security"><i data-icon="lock"></i><span><b>Dữ liệu riêng tư</b><small>Không chia sẻ tài khoản, key hoặc file này cho người khác.</small></span></div>
+    <div id="deliveryItems" class="delivery-items"></div>
+    <div class="delivery-actions"><button id="copyAllDelivery"><i data-icon="copy"></i><span>Sao chép tất cả</span></button><button id="downloadDelivery"><i data-icon="download"></i><span>Tải file TXT</span></button></div>
+  </section>
+
+  <section id="paymentSheet" class="bottom-sheet payment-sheet" role="dialog" aria-modal="true" aria-labelledby="paymentTitle">
+    <div class="sheet-handle"></div><button class="sheet-close" data-close-sheet aria-label="Đóng">×</button>
+    <div class="sheet-category">THANH TOÁN AN TOÀN</div><h2 id="paymentTitle">Chọn phương thức</h2><p id="paymentSummary">Hoàn tất đơn hàng của bạn.</p>
+    <div class="payment-methods">
+      <button data-pay-method="balance" class="active"><span class="pay-logo balance">₫</span><span><b>Số dư ví</b><small>Thanh toán ngay bằng số dư Dino</small></span><i data-icon="chevron"></i></button>
+      <button data-pay-method="bank" hidden style="display:none"><span class="pay-logo bank"><img src="./miniapp/assets/mbbank.png" alt="MB Bank"></span><span><b>MB Bank QR</b><small>Tự động xác nhận 1–3 phút</small></span><i data-icon="chevron"></i></button>
+      <button data-pay-group="binance" aria-expanded="false" aria-controls="binancePaymentOptions"><span class="pay-logo binance"><img src="./miniapp/assets/binance.png" alt="Binance"></span><span><b>Binance</b><small>Chọn kênh thanh toán USDT</small></span><i data-icon="chevron"></i></button>
+      <div id="binancePaymentOptions" class="payment-submethods" hidden>
+        <button data-pay-method="binance"><span class="pay-logo binance"><img src="./miniapp/assets/binance.png" alt="Binance"></span><span><b>Binance ID</b><small>Thanh toán USDT qua Binance Pay ID</small></span><i data-icon="chevron"></i></button>
+        <button data-pay-method="bep20"><span class="pay-logo bep20"><svg viewBox="0 0 32 32" width="24" height="24"><circle cx="16" cy="16" r="16" fill="#F3BA2F"/><path d="M16 6.5l3.2 3.2-3.2 3.2-3.2-3.2L16 6.5zM10 12.5l3.2 3.2-3.2 3.2-3.2-3.2L10 12.5zm12 0l3.2 3.2-3.2 3.2-3.2-3.2 3.2-3.2zM16 18.5l3.2 3.2-3.2 3.2-3.2-3.2 3.2-3.2zM16 12.5l3.2 3.2-3.2 3.2-3.2-3.2 3.2-3.2z" fill="#141414"/></svg></span><span><b>USDT BEP20</b><small>BNB Smart Chain · tự động xác nhận</small></span><i data-icon="chevron"></i></button>
+        <button data-pay-method="polygon"><span class="pay-logo polygon"><svg viewBox="0 0 32 32" width="24" height="24"><circle cx="16" cy="16" r="16" fill="#8247E5"/><path d="M21.5 11.5l-4-2.3c-.3-.2-.7-.2-1 0l-4 2.3c-.3.2-.5.5-.5.9v4.6c0 .4.2.7.5.9l4 2.3c.3.2.7.2 1 0l4-2.3c.3-.2.5-.5.5-.9v-4.6c0-.4-.2-.7-.5-.9zm-5 7.2l-3-1.7v-3.4l3 1.7v3.4z" fill="#fff"/></svg></span><span><b>USDT Polygon</b><small>Mạng Polygon · tự động xác nhận</small></span><i data-icon="chevron"></i></button>
+        <button data-pay-method="trc20"><span class="pay-logo trc20"><svg viewBox="0 0 32 32" width="24" height="24"><circle cx="16" cy="16" r="16" fill="#FF0013"/><path d="M7 8l17 3-10.5 13L7 8zm4.5 3.7l6.5 1.1-4 4.3-2.5-5.4z" fill="#fff"/></svg></span><span><b>USDT TRC20</b><small>Mạng TRON · tự động xác nhận</small></span><i data-icon="chevron"></i></button>
+      </div>
+    </div>
+    <div id="paymentDetail" class="payment-detail"></div>
+    <div class="payment-policy" id="paymentPolicy"><i data-icon="shield"></i><span>Kiểm tra đúng mạng và số tiền trước khi chuyển. Hoàn tiền chỉ cộng vào ví Bot, không hoàn về ngân hàng.</span></div>
+    <div class="terms-confirm-box">
+      <label class="terms-label">
+        <input type="checkbox" id="paymentTermsCheck" checked>
+        <span>Tôi đã đọc và đồng ý với <a href="#" id="openPaymentPolicy">Chính sách & Điều khoản Dino Store</a></span>
+      </label>
+    </div>
+    <button id="confirmPayment" class="primary-button"><span>Tạo hóa đơn thanh toán</span><i data-icon="arrow"></i></button>
+    <p class="safe-note" id="paymentSafeNote"><i data-icon="lock"></i>Hoàn tiền chỉ cộng về số dư bot · không hoàn về ngân hàng.</p>
+  </section>
+
+  <section id="topupSheet" class="bottom-sheet compact" role="dialog" aria-modal="true" aria-labelledby="topupTitle">
+    <div class="sheet-handle"></div><button class="sheet-close" data-close-sheet aria-label="Đóng">×</button><span class="warranty-big-icon"><i data-icon="wallet"></i></span><div class="sheet-category">NẠP VÍ DINO</div><h2 id="topupTitle">Nạp ví Dino</h2><p id="topupSubtitle">Chọn ngân hàng hoặc USDT, nhập số tiền và hệ thống sẽ tự cộng vào ví sau khi xác nhận giao dịch.</p>
+    <label class="field-label">Số tiền muốn nạp<input id="topupAmount" class="sheet-input" type="number" min="10000" step="10000" value="100000" inputmode="numeric"></label>
+    <div class="payment-methods topup-methods">
+      <button data-topup-method="bank" hidden style="display:none"><span class="pay-logo bank"><img src="./miniapp/assets/mbbank.png" alt="MB Bank"></span><span><b>MB Bank QR</b><small>Tự động xác nhận 1–3 phút</small></span><i data-icon="chevron"></i></button>
+      <button data-topup-group="binance" aria-expanded="false" aria-controls="topupBinanceOptions"><span class="pay-logo binance"><img src="./miniapp/assets/binance.png" alt="Binance"></span><span><b>Binance</b><small>Chọn kênh nạp USDT</small></span><i data-icon="chevron"></i></button>
+      <div id="topupBinanceOptions" class="payment-submethods" hidden>
+        <button data-topup-method="binance"><span class="pay-logo binance"><img src="./miniapp/assets/binance.png" alt="Binance"></span><span><b>Binance ID</b><small>Thanh toán USDT qua Binance Pay ID</small></span><i data-icon="chevron"></i></button>
+        <button data-topup-method="bep20"><span class="pay-logo bep20"><svg viewBox="0 0 32 32" width="24" height="24"><circle cx="16" cy="16" r="16" fill="#F3BA2F"/><path d="M16 6.5l3.2 3.2-3.2 3.2-3.2-3.2L16 6.5zM10 12.5l3.2 3.2-3.2 3.2-3.2-3.2L10 12.5zm12 0l3.2 3.2-3.2 3.2-3.2-3.2 3.2-3.2zM16 18.5l3.2 3.2-3.2 3.2-3.2-3.2 3.2-3.2zM16 12.5l3.2 3.2-3.2 3.2-3.2-3.2 3.2-3.2z" fill="#141414"/></svg></span><span><b>USDT BEP20</b><small>BNB Smart Chain · tự động xác nhận</small></span><i data-icon="chevron"></i></button>
+        <button data-topup-method="polygon"><span class="pay-logo polygon"><svg viewBox="0 0 32 32" width="24" height="24"><circle cx="16" cy="16" r="16" fill="#8247E5"/><path d="M21.5 11.5l-4-2.3c-.3-.2-.7-.2-1 0l-4 2.3c-.3.2-.5.5-.5.9v4.6c0 .4.2.7.5.9l4 2.3c.3.2.7.2 1 0l4-2.3c.3-.2.5-.5.5-.9v-4.6c0-.4-.2-.7-.5-.9zm-5 7.2l-3-1.7v-3.4l3 1.7v3.4z" fill="#fff"/></svg></span><span><b>USDT Polygon</b><small>Mạng Polygon · tự động xác nhận</small></span><i data-icon="chevron"></i></button>
+        <button data-topup-method="trc20"><span class="pay-logo trc20"><svg viewBox="0 0 32 32" width="24" height="24"><circle cx="16" cy="16" r="16" fill="#FF0013"/><path d="M7 8l17 3-10.5 13L7 8zm4.5 3.7l6.5 1.1-4 4.3-2.5-5.4z" fill="#fff"/></svg></span><span><b>USDT TRC20</b><small>Mạng TRON · tự động xác nhận</small></span><i data-icon="chevron"></i></button>
+      </div>
+    </div>
+    <div id="topupDetail" class="payment-detail" hidden></div>
+    <div class="terms-confirm-box">
+      <label class="terms-label">
+        <input type="checkbox" id="topupTermsCheck" checked>
+        <span>Tôi đã đọc và đồng ý với <a href="#" id="openTopupPolicy">Chính sách & Điều khoản Dino Store</a></span>
+      </label>
+    </div>
+    <button id="createTopup" class="primary-button"><span>Tạo QR nạp tiền</span><i data-icon="receipt"></i></button>
+    <p class="safe-note"><i data-icon="lock"></i>Nạp tối thiểu 10.000 ₫ · nếu hoàn tiền chỉ hoàn về số dư bot.</p>
+  </section>
+
+  <section id="supportSheet" class="bottom-sheet support-sheet" role="dialog" aria-modal="true" aria-labelledby="supportTitle">
+    <div class="sheet-handle"></div><button class="sheet-close" data-close-sheet aria-label="Đóng">×</button><div class="sheet-category">HỖ TRỢ TRỰC TIẾP</div><h2 id="supportTitle">Chat với Admin</h2><p>Lịch sử hỗ trợ được đồng bộ với hệ thống quản trị Dino Store.</p>
+    <div id="supportMessages" class="support-messages"><div class="delivery-loading">Đang tải hội thoại...</div></div><label class="field-label">Tin nhắn<textarea id="supportText" rows="3" maxlength="1500" placeholder="Nhập nội dung cần hỗ trợ..."></textarea></label><button id="sendSupport" class="primary-button"><span>Gửi cho Admin</span><i data-icon="send"></i></button>
+  </section>
+
+  <section id="policySheet" class="bottom-sheet compact policy-full-sheet" role="dialog" aria-modal="true" aria-labelledby="policyTitle">
+    <div class="sheet-handle"></div><button class="sheet-close" data-close-sheet aria-label="Đóng">×</button><span class="warranty-big-icon"><i data-icon="shield"></i></span><div class="sheet-category">DINO STORE</div><h2 id="policyTitle">CHÍNH SÁCH & ĐIỀU KHOẢN</h2><p>Cập nhật: 06/08/2026 · Vui lòng đọc kỹ trước khi mua hàng hoặc nạp tiền.</p>
+    <div class="policy-scroll-content">
+      <article class="policy-section">
+        <h3>1. Phạm vi áp dụng</h3>
+        <p>Khi tạo đơn, người mua xác nhận đã đọc mô tả sản phẩm, giá, số lượng, phương thức giao và chính sách liên quan hiển thị tại thời điểm đặt hàng.</p>
+      </article>
+      <article class="policy-section">
+        <h3>2. Giá và thanh toán</h3>
+        <p>• Giá có thể thay đổi theo nguồn cung; đơn được tính theo mức giá hiển thị tại bước xác nhận cuối.<br>
+        • Chỉ thanh toán bằng phương thức do bot cung cấp và dùng đúng mã/nội dung của đơn.<br>
+        • Giao dịch sai số tiền, sai nội dung hoặc sau thời hạn có thể cần đối soát thủ công.<br>
+        • QR chỉ dùng cho đơn hàng hợp pháp. Nghiêm cấm gian lận, rửa tiền, chiếm đoạt tài sản và mọi hành vi trái pháp luật.</p>
+      </article>
+      <article class="policy-section">
+        <h3>3. Giao hàng</h3>
+        <p>• Thời gian giao phụ thuộc loại sản phẩm: tự động, xử lý thủ công hoặc Social Media.<br>
+        • Người mua phải kiểm tra sản phẩm ngay sau khi nhận và bảo quản thông tin an toàn.<br>
+        • Không công khai hoặc bán lại nội dung nếu sản phẩm/nhà cung cấp không cho phép.</p>
+      </article>
+      <article class="policy-section">
+        <h3>4. Bảo hành</h3>
+        <p>• Chỉ áp dụng trong thời hạn và phạm vi ghi tại sản phẩm hoặc đơn hàng.<br>
+        • Cần cung cấp mã đơn và bằng chứng lỗi để kiểm tra.<br>
+        • Không bảo hành lỗi do đổi mật khẩu/email khôi phục, chia sẻ nhiều người, sử dụng sai hướng dẫn, vi phạm điều khoản nền tảng hoặc tự ý can thiệp sản phẩm.<br>
+        • Dịch vụ Social Media chỉ được refill/bù tụt khi dịch vụ có ghi rõ hỗ trợ và người mua giữ nguyên điều kiện cần thiết.</p>
+      </article>
+      <article class="policy-section highlight">
+        <h3>5. Hủy đơn và hoàn tiền (ĐẶC BIỆT LƯU Ý)</h3>
+        <p>• Đơn chưa thanh toán có thể hủy trước khi hết hạn. Phần tiền ví đã giữ sẽ được hoàn vào Ví Bot.<br>
+        • Xem xét hoàn tiền khi hệ thống trừ tiền nhưng không tạo được đơn, giao trùng hoặc nhà cung cấp xác nhận hủy/hoàn một phần.<br>
+        • Sản phẩm số đã giao đúng và đã sử dụng không được hoàn tiền.<br>
+        • Đơn lỗi đã sử dụng một phần được xem xét hoàn theo số ngày nguyên còn lại chưa sử dụng vào Ví Bot.<br>
+        <b>• QUY ĐỊNH HOÀN TIỀN VÍ BOT: Mọi khoản hoàn tiền (bao gồm đơn nạp tiền hoặc thanh toán trực tiếp qua Ngân hàng / Binance / USDT) CHỈ ĐƯỢC HOÀN VỀ SỐ DƯ VÍ BOT (DINO WALLET). Hệ thống TUYỆT ĐỐI KHÔNG HOÀN TIỀN VỀ TÀI KHOẢN NGÂN HÀNG HOẶC VÍ BÊN NGOÀI dưới bất kỳ hình thức nào. Tiền trong Ví Bot được sử dụng để mua các sản phẩm và dịch vụ khác trên hệ thống.</b><br>
+        • Thời gian xử lý hoàn vào Ví Bot phụ thuộc việc đối soát hệ thống và nhà cung cấp.</p>
+      </article>
+      <article class="policy-section">
+        <h3>6. Dữ liệu và quyền riêng tư</h3>
+        <p>• Bot chỉ sử dụng thông tin cần thiết để tạo đơn, giao hàng, hỗ trợ, chống gian lận và đối soát.<br>
+        • Không gửi mật khẩu ngân hàng, OTP, khóa ví hoặc dữ liệu không cần thiết.<br>
+        • Thông tin có thể được cung cấp cho cơ quan có thẩm quyền khi pháp luật yêu cầu.</p>
+      </article>
+      <article class="policy-section">
+        <h3>7. Hành vi bị cấm</h3>
+        <p>• Dùng sản phẩm cho lừa đảo, spam, xâm nhập trái phép, phát tán mã độc, đánh cắp dữ liệu hoặc nội dung vi phạm pháp luật.<br>
+        • Lợi dụng lỗi hệ thống, tạo giao dịch giả, hoàn tiền gian lận hoặc cố tình tạo đơn trùng.<br>
+        • Dino Store có thể từ chối xử lý và đóng tài khoản khi phát hiện dấu hiệu bất thường.</p>
+      </article>
+      <article class="policy-section">
+        <h3>8. Khiếu nại và hỗ trợ</h3>
+        <p>Gửi yêu cầu qua Hỗ Trợ & Liên Hệ, kèm mã đơn, thời gian, nội dung và bằng chứng. Hai bên ưu tiên kiểm tra dữ liệu hệ thống và trao đổi để giải quyết minh bạch.</p>
+      </article>
+    </div>
+    <button class="primary-button" data-close-sheet style="margin-top:12px"><span>Đã đọc và hiểu rõ</span><i data-icon="check"></i></button>
+  </section>
+
+  <section id="adminDetailSheet" class="bottom-sheet compact" role="dialog" aria-modal="true" aria-labelledby="adminDetailTitle">
+    <div class="sheet-handle"></div><button class="sheet-close" data-close-sheet aria-label="Đóng">×</button><div class="sheet-category">CHI TIẾT QUẢN TRỊ</div><h2 id="adminDetailTitle">Đơn hàng</h2><p id="adminDetailSummary">Đang tải dữ liệu đã xác minh...</p><div id="adminDetailContent" class="admin-detail-grid"></div>
+  </section>
+
+  <section id="cartSheet" class="bottom-sheet compact" role="dialog" aria-modal="true" aria-labelledby="cartTitle"><div class="sheet-handle"></div><button class="sheet-close" data-close-sheet aria-label="Đóng">×</button><div class="sheet-category">GIỎ HÀNG ĐỒNG BỘ</div><h2 id="cartTitle">Sản phẩm đã lưu</h2><p>Mỗi sản phẩm vẫn được thanh toán riêng để đảm bảo kho và hoàn tiền chính xác.</p><div id="cartItems" class="cart-list"></div><div class="cart-total"><small>Tạm tính</small><b id="cartTotal">0 ₫</b></div></section>
+
+  <section id="wheelSheet" class="bottom-sheet wheel-sheet" role="dialog" aria-modal="true" aria-labelledby="wheelTitle">
+    <div class="sheet-handle"></div><button class="sheet-close" data-close-sheet aria-label="Đóng">×</button>
+    <div class="sheet-category">VẬN MAY MỖI NGÀY</div>
+    <h2 id="wheelTitle">Vòng Quay May Mắn</h2>
+    <p>Quay thưởng trúng quà nạp ví và voucher giảm giá cực hot!</p>
+    <div class="wheel-box">
+      <div class="wheel-pointer"></div>
+      <canvas id="wheelCanvas" class="wheel-canvas" width="540" height="540"></canvas>
+      <div class="wheel-center-btn" id="spinCenterBtn"><span>QUAY</span></div>
+    </div>
+    <div class="wheel-status-grid">
+      <div class="wheel-status-card"><small>Lượt quay còn lại</small><strong id="wheelSpinsText">0</strong></div>
+      <div class="wheel-status-card"><small>Tổng đã trúng</small><strong id="wheelWonText">0 ₫</strong></div>
+    </div>
+    <button id="spinWheelBtn" class="primary-button wheel-spin-btn"><i data-icon="zap"></i><span>QUAY NGAY!</span></button>
+    <p class="safe-note"><i data-icon="shield"></i> Hoàn thành đơn hàng hoặc đăng nhập mỗi ngày để nhận lượt quay</p>
+  </section>
+
+  <section id="surfsharkActivateSheet" class="bottom-sheet" aria-label="Kích hoạt Surfshark VPN">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <div>
+        <span class="sheet-kicker">SURFSHARK AUTO-LOGIN</span>
+        <h2 id="ssOrderTitle">Kích hoạt thiết bị</h2>
+      </div>
+      <div class="ss-head-right">
+        <span id="ssSlotsBadge" class="ss-slots-pill">Còn 0/0 lượt</span>
+        <button class="close-sheet" data-close-sheet aria-label="Đóng"><i data-icon="close"></i></button>
+      </div>
+    </div>
+    <div class="ss-steps">
+      <div><b>1</b><span>Mở app <b>Surfshark</b> trên thiết bị muốn đăng nhập</span></div>
+      <div><b>2</b><span>Chọn <b>Log in</b> → <b>Log in with code</b> để lấy mã 6 ký tự</span></div>
+      <div><b>3</b><span>Nhập mã 6 ký tự vào ô bên dưới (nhập sai/hết hạn <b>không mất lượt</b>)</span></div>
+    </div>
+    <div class="ss-form">
+      <label class="ss-label" for="ssCodeInput">MÃ ĐĂNG NHẬP 6 KÝ TỰ</label>
+      <div class="ss-input-row">
+        <input id="ssCodeInput" class="ss-code-input" type="text" maxlength="6" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" placeholder="VD: X9K2P4">
+        <button id="ssSubmitBtn" class="primary-button ss-submit-btn" type="button">
+          <span>Kích hoạt ngay</span><i data-icon="check"></i>
+        </button>
+      </div>
+      <div id="ssFeedback" class="ss-feedback" hidden></div>
+    </div>
+    <div id="ssHistoryWrap" class="ss-history-wrap" hidden>
+      <small>CÁC THIẾT BỊ ĐÃ KÍCH HOẠT</small>
+      <div id="ssHistoryList" class="ss-history-list"></div>
+    </div>
+  </section>
+
+  <div id="toast" class="toast"><i data-icon="check"></i><span></span></div>
+  <script>
+    function locale() {
+      try {
+        const lang = localStorage.getItem('dino_miniapp_lang') || 'vi';
+        return { vi: 'vi-VN', en: 'en-US', zh: 'zh-CN' }[lang] || 'vi-VN';
+      } catch (e) {
+        return 'vi-VN';
+      }
+    }
+    window.locale = locale;
+    window.addEventListener('load', () => {
+      const enableBalance = () => {
+        const button = document.querySelector('[data-pay-method="balance"]');
+        if (!button) return;
+        button.disabled = false;
+        button.classList.remove('disabled');
+        button.removeAttribute('title');
+      };
+      enableBalance();
+      setTimeout(enableBalance, 250);
+      setTimeout(enableBalance, 1000);
+    });
+  </script>
+  <script src="./miniapp/assets/app.js?v=20261115-r3"></script>
+</body>
+</html>
