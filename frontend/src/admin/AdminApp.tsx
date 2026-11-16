@@ -276,8 +276,8 @@ export default function AdminApp() {
   const [settingsForm, setSettingsForm] = useState<any>({
     botToken: '',
     adminChatId: '',
-    bankName: 'MBBANK',
-    bankAccount: '1110200899999',
+    bankName: 'VCB',
+    bankAccount: 'HAI100TR',
     bankAccountName: 'NGUYEN HOANG HAI',
     payosClientId: '',
     payosApiKey: '',
@@ -310,8 +310,8 @@ export default function AdminApp() {
 
   // Bank accounts config
   const [bankAccounts, setBankAccounts] = useState([
-    { id: 'b-1', bankCode: 'MBBANK', accountNo: '1110200899999', accountName: 'NGUYEN HOANG HAI', isActive: true, isDefault: true },
-    { id: 'b-2', bankCode: 'VCB', accountNo: '999911102008', accountName: 'NGUYEN HOANG HAI', isActive: false, isDefault: false }
+    { id: 'b-1', bankCode: 'VCB', accountNo: 'HAI100TR', accountName: 'NGUYEN HOANG HAI', isActive: true, isDefault: true },
+    { id: 'b-2', bankCode: 'MBBANK', accountNo: '1110200899999', accountName: 'NGUYEN HOANG HAI', isActive: false, isDefault: false }
   ]);
 
   // Crypto wallets config
@@ -371,9 +371,9 @@ export default function AdminApp() {
             ...prev,
             botToken: setRes.botToken || '',
             adminChatId: setRes.adminChatId || '',
-            bankName: setRes.bankName || 'MBBANK',
-            bankAccount: setRes.bankAccount || '1110200899999',
-            bankAccountName: setRes.bankAccountName || 'NGUYEN HOANG HAI',
+            bankName: setRes.bankName || 'VCB',
+            bankAccount: setRes.bankAccount || setRes.accountNo || 'HAI100TR',
+            bankAccountName: setRes.bankAccountName || setRes.accountName || 'NGUYEN HOANG HAI',
             payosClientId: setRes.payosClientId || '',
             payosApiKey: setRes.payosApiKey || '',
             payosChecksumKey: setRes.payosChecksumKey || '',
@@ -2802,7 +2802,42 @@ export default function AdminApp() {
 
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                 <div className="rounded-xl border border-border bg-card p-6 shadow-xs space-y-4">
-                  <h2 className="text-base font-semibold text-foreground">Tài khoản ngân hàng VietQR</h2>
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-base font-semibold text-foreground">Tài khoản ngân hàng VietQR</h2>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-500">
+                      <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                      VCB Vietcombank Active
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-foreground mb-1.5">Chọn nhanh ngân hàng</label>
+                    <div className="grid grid-cols-3 gap-2 mb-3">
+                      {[
+                        { code: 'VCB', bin: '970436', name: 'Vietcombank', highlight: true },
+                        { code: 'MBBANK', bin: '970422', name: 'MB Bank' },
+                        { code: 'TCB', bin: '970407', name: 'Techcombank' },
+                        { code: 'ACB', bin: '970416', name: 'ACB' },
+                        { code: 'ICB', bin: '970415', name: 'VietinBank' },
+                        { code: 'BIDV', bin: '970418', name: 'BIDV' }
+                      ].map(b => (
+                        <button
+                          key={b.code}
+                          type="button"
+                          onClick={() => setSettingsForm({ ...settingsForm, bankName: b.code })}
+                          className={`rounded-lg border p-2 text-left text-xs transition-all ${
+                            settingsForm.bankName === b.code
+                              ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400 font-bold shadow-xs'
+                              : 'border-border bg-background hover:bg-muted text-muted-foreground'
+                          }`}
+                        >
+                          <div className="font-semibold text-foreground">{b.name}</div>
+                          <div className="text-[10px] opacity-75">{b.code} • {b.bin}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   <form onSubmit={handleSaveSettings} className="space-y-4">
                     <div>
                       <label className="block text-xs font-medium text-foreground mb-1">Mã ngân hàng (VietQR)</label>
@@ -2841,17 +2876,22 @@ export default function AdminApp() {
                 </div>
 
                 <div className="rounded-xl border border-border bg-card p-6 shadow-xs flex flex-col items-center justify-center text-center">
-                  <h3 className="text-sm font-semibold text-foreground mb-2">Mẫu VietQR nạp tiền</h3>
-                  <div className="size-48 rounded-lg border border-border bg-white p-2 flex items-center justify-center">
+                  <h3 className="text-sm font-semibold text-foreground mb-2">Mẫu VietQR nạp tiền (Vietcombank)</h3>
+                  <div className="size-52 rounded-xl border border-border bg-white p-3 flex items-center justify-center shadow-md">
                     <img
-                      src={`https://img.vietqr.io/image/${settingsForm.bankName}-${settingsForm.bankAccount}-compact2.png?amount=100000&addInfo=NAP%20HAI1110`}
+                      src={`https://img.vietqr.io/image/${settingsForm.bankName}-${settingsForm.bankAccount}-compact2.png?amount=100000&addInfo=NAP%20HAI1110&accountName=${encodeURIComponent(settingsForm.bankAccountName || 'NGUYEN HOANG HAI')}`}
                       alt="VietQR Test"
                       className="size-full object-contain"
                     />
                   </div>
-                  <p className="mt-3 text-xs text-muted-foreground font-mono">
-                    {settingsForm.bankName} • {settingsForm.bankAccount}
-                  </p>
+                  <div className="mt-3 space-y-1">
+                    <p className="text-sm font-bold text-foreground">
+                      {settingsForm.bankName === 'VCB' ? 'Vietcombank (VCB)' : settingsForm.bankName} • {settingsForm.bankAccount}
+                    </p>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
+                      {settingsForm.bankAccountName}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>

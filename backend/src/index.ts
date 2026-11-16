@@ -46,8 +46,12 @@ function loadStoreSettings() {
   } catch {}
   return {
     bankId: '970436',
+    bankName: 'VCB',
+    bankFullName: 'Vietcombank (VCB)',
     accountNo: 'HAI100TR',
+    bankAccount: 'HAI100TR',
     accountName: 'NGUYEN HOANG HAI',
+    bankOwner: 'NGUYEN HOANG HAI',
     announcement: 'Chào mừng bạn đến với Shop Hai1110# — Hệ thống bán tài khoản & bản quyền tự động 24/7!',
     maintenanceMode: false,
     usdtRate: 25400,
@@ -3717,7 +3721,14 @@ app.get(['/miniapp/api/bootstrap', '/api/bootstrap'], async (req, res) => {
       categories: dbCategories.map(c => c.name),
       payment_methods: {
         balance: { label: 'Số dư ví Dino', enabled: true },
-        bank: { label: 'Chuyển khoản VietQR', enabled: true },
+        bank: {
+          label: 'Chuyển khoản Vietcombank (VCB)',
+          enabled: true,
+          bank_name: 'Vietcombank (VCB)',
+          bank_code: 'VCB',
+          account_no: 'HAI100TR',
+          account_name: 'NGUYEN HOANG HAI'
+        },
         usdt: { label: 'USDT (TRC20)', enabled: true }
       },
       orders,
@@ -3882,9 +3893,9 @@ app.post('/miniapp/api/topup', async (req, res) => {
     const method = req.body?.payment_method || 'bank';
 
     const s = loadStoreSettings();
-    const bankName = s.bankName || 'MBBANK';
-    const bankAcc = s.bankAccount || '0333333333';
-    const bankOwner = s.bankOwner || 'NGUYEN HOANG HAI';
+    const bankName = s.bankName || (s.bankId === '970436' ? 'VCB' : (s.bankId || 'VCB'));
+    const bankAcc = s.bankAccount || s.accountNo || 'HAI100TR';
+    const bankOwner = s.bankOwner || s.accountName || 'NGUYEN HOANG HAI';
 
     const code = `NAP${Date.now().toString().slice(-6)}${crypto.randomInt(10, 99)}`;
     const qrUrl = `https://img.vietqr.io/image/${bankName}-${bankAcc}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(code)}&accountName=${encodeURIComponent(bankOwner)}`;
