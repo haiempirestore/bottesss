@@ -120,7 +120,7 @@
       "id": "prod_c8f7c01ea86a",
       "name": "Slot Office 365 1 năm BHF",
       "description": "Microsoft 365 Family Premium 1 Năm + 1TB OneDrive\nSlot Nâng chính chủ - Bảo Hành 12 Tháng\n- Lưu ý: sau khi mua hàng vui lòng gửi mail cho admin, Không hoàn tiền với all lý do!",
-      "price": 190000,
+      "price": 165000,
       "salePrice": 165000,
       "imageUrl": "https://img.icons8.com/color/480/microsoft-office-2019.png",
       "category": {
@@ -1181,5 +1181,5 @@
       ]
     }
   ],
-  "updatedAt": "2026-11-16T18:55:12.525Z"
+  "updatedAt": "2026-11-16T18:57:38.567Z"
 }
