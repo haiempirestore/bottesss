@@ -10566,3 +10566,81 @@ h1, h2, h3, h4 {
   flex: none;
 }
 
+/* Modal bắt buộc mở qua Telegram Bot */
+.telegram-required-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(8, 11, 17, 0.96);
+  backdrop-filter: blur(20px);
+}
+.telegram-required-card {
+  max-width: 380px;
+  width: 100%;
+  background: linear-gradient(180deg, #131A26 0%, #0C1017 100%);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 20px;
+  padding: 32px 24px;
+  text-align: center;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 40px rgba(56, 189, 248, 0.15);
+}
+.tg-icon-badge {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%);
+  color: #fff;
+  box-shadow: 0 0 25px rgba(56, 189, 248, 0.5);
+}
+.telegram-required-card h2 {
+  font-size: 19px;
+  font-weight: 800;
+  color: #F8FAFC;
+  margin: 0 0 12px;
+}
+.tg-notice-desc {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #94A3B8;
+  margin: 0 0 24px;
+}
+.tg-notice-desc b {
+  color: #38BDF8;
+}
+.tg-notice-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.tg-open-bot-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4);
+  transition: transform 0.15s ease;
+}
+.tg-open-bot-btn:hover {
+  transform: translateY(-2px);
+}
+.tg-demo-link {
+  font-size: 12px;
+  color: #64748B;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
