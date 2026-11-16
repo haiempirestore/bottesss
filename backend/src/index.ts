@@ -2616,7 +2616,7 @@ if (botToken) {
     }
 
     const price = product.salePrice ?? product.price;
-    const usdPrice = (price / 25400).toFixed(2);
+    const usdPrice = (price / 25000).toFixed(2);
     const prodCode = `SP-${product.id.slice(-8).toUpperCase()}`;
 
     // Lưu state cho user nhập số lượng trực tiếp
