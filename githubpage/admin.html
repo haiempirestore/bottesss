@@ -1,17 +1,28 @@
 <!doctype html>
-<html lang="vi">
+<html lang="vi" class="__variable_8adcd2 __variable_46451f" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0d0408" />
-    <title>Shop Hai1110# — Trang Web Quản Trị Hệ Thống (Localhost Server 4000)</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#09090b" media="(prefers-color-scheme: dark)" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Admin · Bán hàng Telegram</title>
+    <meta name="description" content="Bảng điều khiển quản trị cho bot Telegram: đơn hàng, kho, ví, thanh toán." />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" sizes="any" />
+    <link rel="stylesheet" href="./ref_fonts.css" />
+    <link rel="stylesheet" href="./ref_tokens.css" />
+    <link rel="stylesheet" href="./ref_tailwind.css" />
     <script src="./config.js"></script>
-    <script type="module" crossorigin src="./assets/admin-DVm_shBx.js"></script>
-    <link rel="modulepreload" crossorigin href="./assets/x-CKtdbYZO.js">
-    <link rel="stylesheet" crossorigin href="./assets/admin-BnO5O0GV.css">
+    <script>
+      (function(){
+        var s = null;
+        try { s = localStorage.getItem("admin-theme"); } catch(e){}
+        var t = s === "light" || s === "dark" ? s : matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        document.documentElement.setAttribute("data-theme", t);
+      })()
+    </script>
+    <script type="module" crossorigin src="./assets/admin-DvkidSeL.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/admin-DGgGb00V.css">
   </head>
   <body>
     <div id="admin-root"></div>

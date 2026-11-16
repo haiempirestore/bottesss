@@ -2582,34 +2582,21 @@ export default function App() {
               </div>
             </div>
 
-            {/* Các nút thao tác nạp tiền ngay trên web */}
+            {/* Thông báo tự động duyệt chuyển khoản */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 14 }}>
-              <button
-                className="btn-primary-pill"
-                disabled={depositChecking}
-                onClick={handleCheckDeposit}
-                style={{
-                  width: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  fontSize: 14,
-                  padding: '13px',
-                  background: 'linear-gradient(135deg, #a855f7 0%, #6b21a8 100%)',
-                  boxShadow: '0 4px 18px rgba(168, 85, 247, 0.4)'
-                }}
-              >
-                {depositChecking ? (
-                  <>
-                    <RefreshCw size={16} className="spin-fast" /> Đang kiểm tra giao dịch nạp...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw size={16} /> 🔄 Tôi Đã Chuyển Khoản (Kiểm Tra Số Dư)
-                  </>
-                )}
-              </button>
+              <div style={{
+                textAlign: 'center',
+                padding: '10px 14px',
+                borderRadius: '12px',
+                background: 'rgba(168, 85, 247, 0.12)',
+                border: '1px solid rgba(168, 85, 247, 0.3)',
+                color: '#d8b4fe',
+                fontSize: 12.5,
+                lineHeight: 1.5
+              }}>
+                ⚡ <b>Hệ thống tự động duyệt giao dịch 24/7!</b><br />
+                Sau khi chuyển khoản thành công, đơn hàng sẽ được kích hoạt tự động sau vài giây.
+              </div>
 
               <button
                 className="btn-secondary-pill"

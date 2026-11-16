@@ -28,6 +28,7 @@
     "typescript": "^5.7.2"
   },
   "dependencies": {
+    "puppeteer-core": "^25.16.0",
     "qrcode": "^1.5.4"
   }
 }
