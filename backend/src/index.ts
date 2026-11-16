@@ -1423,11 +1423,15 @@ app.put('/api/admin/categories/:id', adminAuth, async (req, res) => {
 app.delete('/api/admin/categories/:id', adminAuth, async (req, res) => {
   try {
     const id = String(req.params.id);
-    const count = await prisma.product.count({ where: { categoryId: id } });
+    const count = await prisma.product.count({ where: { categoryId: id, isActive: true } });
     if (count > 0) {
-      return res.status(400).json({ error: `Không thể xoá vì danh mục này đang chứa ${count} sản phẩm. Hãy chuyển danh mục hoặc xoá sản phẩm trước!` });
+      return res.status(400).json({ error: `Không thể xoá vì danh mục này đang chứa ${count} sản phẩm đang hoạt động. Hãy chuyển danh mục hoặc xoá sản phẩm trước!` });
     }
-    await prisma.category.delete({ where: { id } });
+    try {
+      await prisma.category.delete({ where: { id } });
+    } catch {
+      await prisma.category.update({ where: { id }, data: { isActive: false } });
+    }
     await exportGithubProducts();
     res.json({ ok: true });
   } catch (err: any) {
